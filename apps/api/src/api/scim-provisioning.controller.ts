@@ -13,24 +13,29 @@ import {
 import type { RequestWithAuth } from './auth.types.js';
 import { ScimProvisioningService } from './scim-provisioning.service.js';
 import { SessionAuthGuard } from './session-auth.guard.js';
+import { RouteAccess } from './route-access.js';
 
+@RouteAccess('scim-token')
 @Controller('api/v1')
 export class ScimProvisioningController {
   constructor(private readonly scimProvisioningService: ScimProvisioningService) {}
 
   @Get('auth/teams/:teamId/scim/tokens')
+  @RouteAccess('session')
   @UseGuards(SessionAuthGuard)
   listTokens(@Param('teamId') teamId: string, @Req() request: RequestWithAuth) {
     return this.scimProvisioningService.listTokens(teamId, request.auth!);
   }
 
   @Get('auth/teams/:teamId/scim/users')
+  @RouteAccess('session')
   @UseGuards(SessionAuthGuard)
   listProvisionedUsers(@Param('teamId') teamId: string, @Req() request: RequestWithAuth) {
     return this.scimProvisioningService.listProvisionedUsers(teamId, request.auth!);
   }
 
   @Post('auth/teams/:teamId/scim/tokens')
+  @RouteAccess('session')
   @UseGuards(SessionAuthGuard)
   createToken(
     @Param('teamId') teamId: string,
@@ -41,6 +46,7 @@ export class ScimProvisioningController {
   }
 
   @Delete('auth/teams/:teamId/scim/tokens/:tokenId')
+  @RouteAccess('session')
   @UseGuards(SessionAuthGuard)
   revokeToken(
     @Param('teamId') teamId: string,

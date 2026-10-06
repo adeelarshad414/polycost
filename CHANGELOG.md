@@ -9,6 +9,11 @@ once tagged releases begin.
 
 ### Security
 
+- Tenancy enforcement, ADR-0001 step 1 (P2-1a): comparisons, workloads and diagram
+  imports record their owning team; team-owned data answers `404` outside its team;
+  viewers are read-only; billing reconciliation no longer accepts another team's or an
+  anonymous comparison; `ANONYMOUS_MODE` (Helm sets it explicitly); every route carries
+  an access class checked by a contract test; `/terraform/generate` is rate limited.
 - Audit Phase 0 and Phase 1 (#244, #249, #250, #256, #257, #258):
   - Production refuses to boot on mock pricing unless explicitly allowed.
   - Rate limits key on the real client address (`TRUST_PROXY_HOPS`).

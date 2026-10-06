@@ -7,7 +7,9 @@ import {
   supportedCanonicalRegions,
 } from '../pricing-normalization/region-map.js';
 import { ApiValidationError } from './api-errors.js';
-import { CostManagementService } from './cost-management.service.js';
+import { CostManagementService, hashShareToken } from './cost-management.service.js';
+import { OPEN_ACCESS, ResourceAccessService } from './resource-access.service.js';
+import { RouteAccess } from './route-access.js';
 import {
   BudgetInput,
   CachedPricingCompareQuery,
@@ -54,12 +56,14 @@ const PRICING_TERMS: CachedPricingTerm[] = [
 ];
 const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
+@RouteAccess('public')
 @Controller('api/v1/pricing')
 export class CachedPricingController {
   constructor(
     private readonly costManagementService: CostManagementService,
     private readonly apiRateLimitService: ApiRateLimitService = new ApiRateLimitService(),
     private readonly configService?: ConfigService<AppConfig, true>,
+    private readonly access: ResourceAccessService = OPEN_ACCESS,
   ) {}
 
   @Get('compare')
@@ -80,6 +84,8 @@ export class CachedPricingController {
     return this.costManagementService.compareCachedPricing(parseCompareQuery(query));
   }
 
+  // ADR-0001: reads a workload, so it follows the workload's owner.
+  @RouteAccess('core')
   @Get('breakdown')
   async breakdown(
     @Query() query: Record<string, QueryValue>,
@@ -96,6 +102,7 @@ export class CachedPricingController {
     );
 
     const workloadId = parseUuid(query.workloadId, 'workloadId');
+    await this.access.assert('workload', workloadId, await this.access.actor(request), 'read');
     const term = parsePricingTerm(query.term);
 
     return this.costManagementService.getWorkloadCostBreakdown(workloadId, term);
@@ -119,12 +126,14 @@ export class CachedPricingController {
   }
 }
 
+@RouteAccess('core')
 @Controller('api/v1/workloads')
 export class WorkloadsController {
   constructor(
     private readonly costManagementService: CostManagementService,
     private readonly apiRateLimitService: ApiRateLimitService = new ApiRateLimitService(),
     private readonly configService?: ConfigService<AppConfig, true>,
+    private readonly access: ResourceAccessService = OPEN_ACCESS,
   ) {}
 
   @Post()
@@ -142,16 +151,23 @@ export class WorkloadsController {
       'RATE_LIMIT_PUBLIC_WRITE_PER_MINUTE',
     );
 
-    return this.costManagementService.createWorkload(parseWorkloadInput(body));
+    const actor = await this.access.actor(request);
+
+    return this.costManagementService.createWorkload(
+      parseWorkloadInput(body),
+      this.access.ownerForCreate(actor),
+    );
   }
 }
 
+@RouteAccess('core')
 @Controller('api/v1/budgets')
 export class BudgetsController {
   constructor(
     private readonly costManagementService: CostManagementService,
     private readonly apiRateLimitService: ApiRateLimitService = new ApiRateLimitService(),
     private readonly configService?: ConfigService<AppConfig, true>,
+    private readonly access: ResourceAccessService = OPEN_ACCESS,
   ) {}
 
   @Post()
@@ -169,16 +185,26 @@ export class BudgetsController {
       'RATE_LIMIT_PUBLIC_WRITE_PER_MINUTE',
     );
 
-    return this.costManagementService.createBudget(parseBudgetInput(body));
+    const input = parseBudgetInput(body);
+    await this.access.assert(
+      'workload',
+      input.workloadId,
+      await this.access.actor(request),
+      'write',
+    );
+
+    return this.costManagementService.createBudget(input);
   }
 }
 
+@RouteAccess('core')
 @Controller('api/v1/alerts')
 export class AlertsController {
   constructor(
     private readonly costManagementService: CostManagementService,
     private readonly apiRateLimitService: ApiRateLimitService = new ApiRateLimitService(),
     private readonly configService?: ConfigService<AppConfig, true>,
+    private readonly access: ResourceAccessService = OPEN_ACCESS,
   ) {}
 
   @Get()
@@ -199,7 +225,10 @@ export class AlertsController {
     // workloadId is REQUIRED: this is an anonymous capability-URL surface, so a
     // caller may only list alerts for a workload id they already hold. Allowing
     // it to be omitted previously returned every workload's alerts (data leak).
-    return this.costManagementService.listAlerts(parseUuid(workloadId, 'workloadId'));
+    const id = parseUuid(workloadId, 'workloadId');
+    await this.access.assert('workload', id, await this.access.actor(request), 'read');
+
+    return this.costManagementService.listAlerts(id);
   }
 
   @Patch(':id')
@@ -218,19 +247,21 @@ export class AlertsController {
       'RATE_LIMIT_PUBLIC_WRITE_PER_MINUTE',
     );
 
-    return this.costManagementService.updateAlertDismissed(
-      parseUuid(alertId, 'id'),
-      parseDismissedUpdate(body),
-    );
+    const id = parseUuid(alertId, 'id');
+    await this.access.assert('alert', id, await this.access.actor(request), 'write');
+
+    return this.costManagementService.updateAlertDismissed(id, parseDismissedUpdate(body));
   }
 }
 
+@RouteAccess('core')
 @Controller('api/v1/share-links')
 export class ShareLinksController {
   constructor(
     private readonly costManagementService: CostManagementService,
     private readonly apiRateLimitService: ApiRateLimitService = new ApiRateLimitService(),
     private readonly configService?: ConfigService<AppConfig, true>,
+    private readonly access: ResourceAccessService = OPEN_ACCESS,
   ) {}
 
   @Post()
@@ -248,7 +279,15 @@ export class ShareLinksController {
       'RATE_LIMIT_SHARE_LINK_PER_MINUTE',
     );
 
-    return this.costManagementService.createShareLink(parseShareLinkInput(body));
+    const input = parseShareLinkInput(body);
+    await this.access.assert(
+      'workload',
+      input.workloadId,
+      await this.access.actor(request),
+      'write',
+    );
+
+    return this.costManagementService.createShareLink(input);
   }
 
   @Post(':token/revoke')
@@ -265,6 +304,10 @@ export class ShareLinksController {
       response,
       'RATE_LIMIT_SHARE_LINK_PER_MINUTE',
     );
+
+    // Revoking a team's link is an admin action (ADR-0001 §3.3).
+    const actor = await this.access.actor(request);
+    await this.access.assert('shareLink', hashShareToken(token), actor, 'admin');
 
     return this.costManagementService.revokeShareLink(token);
   }
@@ -284,10 +327,18 @@ export class ShareLinksController {
       'RATE_LIMIT_SHARE_LINK_PER_MINUTE',
     );
 
+    await this.access.assert(
+      'shareLink',
+      hashShareToken(token),
+      await this.access.actor(request),
+      'read',
+    );
+
     return this.costManagementService.getShareLinkAnalytics(token);
   }
 }
 
+@RouteAccess('public')
 @Controller('api/v1/share')
 export class SharedReportsController {
   constructor(
@@ -354,6 +405,7 @@ export class SharedReportsController {
   }
 }
 
+@RouteAccess('public')
 @Controller('api/v1/exchange-rates')
 export class ExchangeRatesController {
   constructor(

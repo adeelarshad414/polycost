@@ -11,12 +11,16 @@ import {
   writeRateLimitHeaders,
 } from './rate-limit.service.js';
 import type { RateLimitHeaderResponse } from './rate-limit.service.js';
+import { OPEN_ACCESS, ResourceAccessService } from './resource-access.service.js';
+import { RouteAccess } from './route-access.js';
 
 interface RequestLike {
   ip?: string;
   headers?: Record<string, unknown>;
 }
 
+// Stateless parsing, but core: ANONYMOUS_MODE=disabled requires a session.
+@RouteAccess('core')
 @Controller('api/v1/workload')
 export class WorkloadController {
   constructor(
@@ -24,6 +28,7 @@ export class WorkloadController {
     private readonly comparisonApplicationService: ComparisonApplicationService,
     private readonly apiRateLimitService: ApiRateLimitService,
     private readonly configService: ConfigService<AppConfig, true>,
+    private readonly access: ResourceAccessService = OPEN_ACCESS,
   ) {}
 
   @Post('parse')
@@ -38,6 +43,7 @@ export class WorkloadController {
       this.configService.get('RATE_LIMIT_NL_PARSE_PER_MINUTE', { infer: true }),
     );
     writeRateLimitHeaders(response, rateLimit);
+    await this.access.actor(request);
 
     if (!isRecord(body) || typeof body.naturalLanguageInput !== 'string') {
       throw new ApiValidationError('naturalLanguageInput is required', [
@@ -63,6 +69,7 @@ export class WorkloadController {
       this.configService.get('RATE_LIMIT_PUBLIC_WRITE_PER_MINUTE', { infer: true }),
     );
     writeRateLimitHeaders(response, rateLimit);
+    await this.access.actor(request);
 
     return this.comparisonApplicationService.validateNws(body);
   }

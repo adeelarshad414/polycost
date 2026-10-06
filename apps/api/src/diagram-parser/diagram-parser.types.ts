@@ -195,6 +195,8 @@ export interface LlmClassifierClient {
 }
 
 export interface DiagramImportRecordInput {
+  /** Owning team (ADR-0001); null or absent = anonymous. */
+  teamId?: string | null;
   importId: string;
   format: DiagramInputFormat;
   fileName?: string;

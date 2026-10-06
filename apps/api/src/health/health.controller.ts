@@ -1,11 +1,13 @@
 import { Controller, Get, HttpStatus, Res } from '@nestjs/common';
 import { HealthService } from './health.service.js';
+import { RouteAccess } from '../api/route-access.js';
 
 /** Minimal shape of the Fastify reply; avoids importing the platform type. */
 interface StatusResponse {
   status(code: number): unknown;
 }
 
+@RouteAccess('public')
 @Controller()
 export class HealthController {
   constructor(private readonly healthService: HealthService) {}

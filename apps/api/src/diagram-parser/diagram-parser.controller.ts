@@ -1,5 +1,7 @@
 import { Body, Controller, Post, Req, Res } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
+import { OPEN_ACCESS, ResourceAccessService } from '../api/resource-access.service.js';
+import { RouteAccess } from '../api/route-access.js';
 import { AppConfig } from '../config/config.schema.js';
 import {
   ApiRateLimitService,
@@ -18,6 +20,8 @@ interface RequestLike {
   headers?: Record<string, unknown>;
 }
 
+// Imports are stamped with the caller's team (ADR-0001); core for ANONYMOUS_MODE.
+@RouteAccess('core')
 @Controller('api/v1/parse')
 export class DiagramParserController {
   constructor(
@@ -26,6 +30,7 @@ export class DiagramParserController {
     private readonly diagramTempFileStore: DiagramTempFileStore,
     private readonly apiRateLimitService: ApiRateLimitService,
     private readonly configService: ConfigService<AppConfig, true>,
+    private readonly access: ResourceAccessService = OPEN_ACCESS,
   ) {}
 
   @Post('diagram')
@@ -40,6 +45,7 @@ export class DiagramParserController {
       this.configService.get('RATE_LIMIT_DIAGRAM_PARSE_PER_MINUTE', { infer: true }),
     );
     writeRateLimitHeaders(response, rateLimit);
+    const ownerTeamId = this.access.ownerForCreate(await this.access.actor(request));
 
     const decoded = this.diagramParserService.decode(body);
     const parsed = await this.diagramParserService.parse({
@@ -66,6 +72,7 @@ export class DiagramParserController {
         ignoredCount: parsed.review.ignoredNodes.length,
         graph: parsed.graph,
         draftNws: parsed.draftNws,
+        teamId: ownerTeamId,
       })
       .catch(() => false);
 

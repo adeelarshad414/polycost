@@ -42,7 +42,7 @@ const MAX_PASSWORD_LENGTH = 1024;
 const TEAM_ADMIN_ROLES = new Set<TeamRole>(['owner', 'admin']);
 const TEAM_OWNER_ROLE: TeamRole = 'owner';
 const INVITABLE_ROLES: Array<Exclude<TeamRole, 'owner'>> = ['admin', 'member'];
-const TEAM_ROLES: TeamRole[] = ['owner', 'admin', 'member'];
+const TEAM_ROLES: TeamRole[] = ['owner', 'admin', 'member', 'viewer'];
 const INVITATION_TTL_DAYS = 7;
 const SSO_STATE_TTL_MINUTES = 10;
 

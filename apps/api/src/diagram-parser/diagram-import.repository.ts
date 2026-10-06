@@ -58,7 +58,8 @@ export class DiagramImportRepository implements OnModuleDestroy {
           ignored_count,
           graph_snapshot,
           nws_snapshot,
-          expires_at
+          expires_at,
+          team_id
         )
         VALUES (
           $1,
@@ -73,7 +74,8 @@ export class DiagramImportRepository implements OnModuleDestroy {
           $10,
           $11::jsonb,
           $12::jsonb,
-          COALESCE($13::timestamptz, now() + interval '24 hours')
+          COALESCE($13::timestamptz, now() + interval '24 hours'),
+          $14
         )
       `,
       [
@@ -90,6 +92,7 @@ export class DiagramImportRepository implements OnModuleDestroy {
         JSON.stringify(input.graph),
         JSON.stringify(input.draftNws),
         input.expiresAt ?? null,
+        input.teamId ?? null,
       ],
     );
 

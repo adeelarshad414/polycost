@@ -1,6 +1,7 @@
 import { readFileSync } from 'node:fs';
 import path from 'node:path';
 import { Controller, Get, Header, Logger, NotFoundException } from '@nestjs/common';
+import { RouteAccess } from './route-access.js';
 
 /**
  * Serves the generated OpenAPI document.
@@ -12,6 +13,7 @@ import { Controller, Get, Header, Logger, NotFoundException } from '@nestjs/comm
  * Read once and cached: the document is ~6000 lines and does not change while
  * the process is running.
  */
+@RouteAccess('public')
 @Controller()
 export class OpenApiController {
   private readonly logger = new Logger(OpenApiController.name);

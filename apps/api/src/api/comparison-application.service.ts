@@ -92,6 +92,7 @@ export class ComparisonApplicationService {
   async createComparison(
     input: unknown,
     options: CreateComparisonOptions = {},
+    ownerTeamId: string | null = null,
   ): Promise<ComparisonResult> {
     if (options.useLivePricing) {
       throw new LiveRefreshUnavailableError(
@@ -103,7 +104,11 @@ export class ComparisonApplicationService {
     const result = await this.comparisonOrchestratorService.compare(nws);
     const resultWithHealthWarnings = mergeWarnings(result, await this.dataHealthWarnings());
 
-    await this.apiDatabaseRepository.saveComparisonWithAuditLog(nws, resultWithHealthWarnings);
+    await this.apiDatabaseRepository.saveComparisonWithAuditLog(
+      nws,
+      resultWithHealthWarnings,
+      ownerTeamId,
+    );
     this.comparisonPrewarmService?.enqueue(resultWithHealthWarnings);
 
     return resultWithHealthWarnings;
@@ -127,9 +132,11 @@ export class ComparisonApplicationService {
     return comparisonPricingEvidence(snapshot.resultSnapshot);
   }
 
+  /** The refreshed comparison is a new row owned by the same team (ADR-0001). */
   async refreshLiveComparison(
     comparisonId: string,
     liveRefreshEnabled: boolean,
+    ownerTeamId: string | null = null,
   ): Promise<ComparisonResult> {
     if (!liveRefreshEnabled) {
       throw new LiveRefreshUnavailableError('Live pricing refresh is disabled for this deployment');
@@ -145,7 +152,11 @@ export class ComparisonApplicationService {
       await this.dataHealthWarnings(),
     );
 
-    await this.apiDatabaseRepository.saveComparisonWithAuditLog(snapshot.nwsSnapshot, refreshed);
+    await this.apiDatabaseRepository.saveComparisonWithAuditLog(
+      snapshot.nwsSnapshot,
+      refreshed,
+      ownerTeamId,
+    );
 
     return refreshed;
   }

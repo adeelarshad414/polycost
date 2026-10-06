@@ -35,8 +35,8 @@ export class CostManagementService {
     private readonly tokenFactory: () => string = () => randomBytes(32).toString('base64url'),
   ) {}
 
-  createWorkload(input: WorkloadInput): Promise<WorkloadRecord> {
-    return this.repository.createWorkload(input);
+  createWorkload(input: WorkloadInput, ownerTeamId: string | null = null): Promise<WorkloadRecord> {
+    return this.repository.createWorkload(input, ownerTeamId);
   }
 
   compareCachedPricing(query: CachedPricingCompareQuery): Promise<CachedPricingCompareRow[]> {

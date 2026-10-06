@@ -179,6 +179,10 @@ config:
   # Real provider pricing. The API refuses to boot in production with mock
   # providers unless allowMockProvidersOutsideDevelopment is also true (demo only).
   useMockProviders: false
+  # ADR-0001. enabled: anyone can compare without an account (capability URLs);
+  # signed-in members' data is still isolated per team. disabled: every core
+  # route requires a session - choose this for a hosted multi-tenant service.
+  anonymousMode: enabled
   allowMockProvidersOutsideDevelopment: false
   # Empty disables tracing; the OTel bootstrap is a no-op without an endpoint.
   otelExporterEndpoint: ''

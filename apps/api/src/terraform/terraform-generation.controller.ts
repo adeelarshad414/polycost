@@ -1,5 +1,15 @@
-import { Body, Controller, Post } from '@nestjs/common';
+import { Body, Controller, Post, Req, Res } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import { ApiValidationError } from '../api/api-errors.js';
+import {
+  ApiRateLimitService,
+  requestIdentity,
+  writeRateLimitHeaders,
+  type RateLimitHeaderResponse,
+} from '../api/rate-limit.service.js';
+import { OPEN_ACCESS, ResourceAccessService } from '../api/resource-access.service.js';
+import { RouteAccess } from '../api/route-access.js';
+import type { AppConfig } from '../config/config.schema.js';
 import { TerraformGenerationService } from './terraform-generation.service.js';
 import {
   TerraformAvailabilityMode,
@@ -9,12 +19,38 @@ import {
   TerraformTargetCloud,
 } from './terraform.types.js';
 
+interface RequestLike {
+  ip?: string;
+  headers?: Record<string, unknown>;
+}
+
+@RouteAccess('core')
 @Controller('api/v1/terraform')
 export class TerraformGenerationController {
-  constructor(private readonly terraformGenerationService: TerraformGenerationService) {}
+  constructor(
+    private readonly terraformGenerationService: TerraformGenerationService,
+    private readonly apiRateLimitService?: ApiRateLimitService,
+    private readonly configService?: ConfigService<AppConfig, true>,
+    private readonly access: ResourceAccessService = OPEN_ACCESS,
+  ) {}
 
   @Post('generate')
-  generate(@Body() body: unknown) {
+  async generate(
+    @Body() body: unknown,
+    @Req() request?: RequestLike,
+    @Res({ passthrough: true }) response?: RateLimitHeaderResponse,
+  ) {
+    if (this.apiRateLimitService) {
+      const rateLimit = await this.apiRateLimitService.consume(
+        'terraform_generate',
+        requestIdentity(request ?? {}),
+        this.configService?.get('RATE_LIMIT_TERRAFORM_PER_MINUTE', { infer: true }) ?? 10,
+      );
+      writeRateLimitHeaders(response, rateLimit);
+    }
+    // Stateless, but still a core route: ANONYMOUS_MODE=disabled requires a session.
+    await this.access.actor(request);
+
     return this.terraformGenerationService.generate(parseGenerateRequest(body));
   }
 }

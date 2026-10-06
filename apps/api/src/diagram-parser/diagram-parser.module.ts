@@ -3,6 +3,7 @@ import { Pool } from 'pg';
 import { DomainMetricsService } from '../observability/domain-metrics.service.js';
 import { instrumentPool } from '../observability/instrumented-pool.js';
 import { ConfigService } from '@nestjs/config';
+import { ApiModule } from '../api/api.module.js';
 import { ApiRateLimitService } from '../api/rate-limit.service.js';
 import { AppConfig } from '../config/config.schema.js';
 import { SecretsService } from '../secrets/secrets.service.js';
@@ -26,6 +27,8 @@ import { VsdxExtractor } from './vsdx.extractor.js';
 import { LlmClassifierClient } from './diagram-parser.types.js';
 
 @Module({
+  // ApiModule provides ResourceAccessService (ADR-0001 ownership + ANONYMOUS_MODE).
+  imports: [ApiModule],
   controllers: [DiagramParserController],
   providers: [
     SecretsService,

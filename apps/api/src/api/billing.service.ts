@@ -277,6 +277,14 @@ export class BillingService {
 
     assertTeamAccess(importRun.teamId, identity);
 
+    // ADR-0001: reconcile only against the team's own comparisons. Another
+    // team's comparison - or an anonymous one - reads as "not found", so the
+    // endpoint cannot be used to read or confirm other tenants' data.
+    const owner = await this.repository.getResourceOwner('comparison', comparisonId);
+    if (!owner || owner.teamId === null || owner.teamId !== identity.teamId) {
+      throw new ApiNotFoundError(`Comparison ${comparisonId} was not found`);
+    }
+
     const [lineItems, comparison] = await Promise.all([
       this.repository.listInvoiceLineItems(importRunId),
       this.repository.getComparison(comparisonId),

@@ -2,7 +2,9 @@ import { Body, Controller, Get, Param, Patch, Post, Req, UseGuards } from '@nest
 import type { RequestWithAuth } from './auth.types.js';
 import { BillingService } from './billing.service.js';
 import { SessionAuthGuard } from './session-auth.guard.js';
+import { RouteAccess } from './route-access.js';
 
+@RouteAccess('session')
 @Controller('api/v1/billing')
 @UseGuards(SessionAuthGuard)
 export class BillingController {

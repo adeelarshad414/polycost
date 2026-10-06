@@ -153,6 +153,8 @@ export const configSchema = z
     RATE_LIMIT_AUTH_PER_MINUTE: z.coerce.number().int().positive().default(10),
     RATE_LIMIT_NL_PARSE_PER_MINUTE: z.coerce.number().default(10),
     RATE_LIMIT_DIAGRAM_PARSE_PER_MINUTE: z.coerce.number().int().positive().default(10),
+    // Terraform generation is CPU-bound and was the one unthrottled public route.
+    RATE_LIMIT_TERRAFORM_PER_MINUTE: z.coerce.number().int().positive().default(10),
     RATE_LIMIT_LIVE_REFRESH_PER_MINUTE: z.coerce.number().default(5),
     AUTH_SESSION_TTL_HOURS: z.coerce.number().int().positive().default(12),
     AUTH_PASSWORD_MIN_LENGTH: z.coerce.number().int().min(8).default(12),
@@ -234,6 +236,10 @@ export const configSchema = z
         'http://localhost:3000,http://localhost:3002,http://127.0.0.1:3000,http://127.0.0.1:3002',
       ),
     FEATURE_LIVE_PRICING_REFRESH_ENABLED: envBoolean(true),
+    // ADR-0001: `enabled` keeps the capability-URL flow (compare without an
+    // account). `disabled` requires a session on every core route; a hosted
+    // multi-tenant deployment sets it explicitly (the Helm chart always does).
+    ANONYMOUS_MODE: z.enum(['enabled', 'disabled']).default('enabled'),
     FEATURE_RESERVED_PRICING: envBoolean(true),
   })
   .superRefine((config, context) => {

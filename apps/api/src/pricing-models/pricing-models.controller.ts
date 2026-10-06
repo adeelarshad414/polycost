@@ -12,6 +12,7 @@ import { AppConfig } from '../config/config.schema.js';
 import { providerRegionForCanonicalRegion } from '../pricing-normalization/region-map.js';
 import { PaymentOptionCode, PricingGranularity, PricingTermCode } from './pricing-models.types.js';
 import { PricingMatrixService } from './pricing-matrix.service.js';
+import { RouteAccess } from '../api/route-access.js';
 
 type QueryValue = string | string[] | undefined;
 interface RequestLike {
@@ -28,6 +29,7 @@ const PAYMENT_OPTIONS: PaymentOptionCode[] = [
   'n_a',
 ];
 
+@RouteAccess('public')
 @Controller('api/v1/pricing')
 export class PricingModelsController {
   constructor(
@@ -107,6 +109,7 @@ export class PricingModelsController {
   }
 }
 
+@RouteAccess('public')
 @Controller('api/v1/compare')
 export class PricingCompareV2Controller {
   constructor(

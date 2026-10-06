@@ -106,6 +106,7 @@ describe('ApiDatabaseRepository', () => {
       JSON.stringify(nwsSnapshot),
       JSON.stringify(comparisonResult),
       comparisonResult.pricingAsOf,
+      null, // team_id: anonymous unless a team is passed (ADR-0001)
     ]);
   });
 

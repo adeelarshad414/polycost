@@ -249,6 +249,8 @@ export function teamRoleLabel(role: TeamRole): string {
       return 'Admin';
     case 'member':
       return 'Member';
+    case 'viewer':
+      return 'Viewer';
   }
 }
 

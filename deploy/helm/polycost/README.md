@@ -88,6 +88,13 @@ passed both.
 | Redis down       | 200            | 200 (`degraded`) | yes       | 0        |
 | Redis + Postgres | 200            | 200              | yes       | 0        |
 
+## Anonymous mode
+
+`config.anonymousMode` is required and always rendered (ADR-0001). `enabled` lets
+people compare without an account (capability URLs) while team data stays isolated;
+`disabled` requires a session on every core route. Choose `disabled` for a hosted,
+multi-tenant service.
+
 ## Database, Redis and workers
 
 - **Pools:** every pod opens four Postgres pools (`api`, `pricing_catalog`,
