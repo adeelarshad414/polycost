@@ -3034,15 +3034,18 @@ function parseTags(value: unknown, field: string): Record<string, string> {
   }
 
   const record = parseObject(value, field);
-  const tags: Record<string, string> = {};
+  // Keys come from the request: build through a Map and Object.fromEntries,
+  // which only creates own properties, so `__proto__` or `constructor` can
+  // never reach the prototype (CodeQL js/remote-property-injection).
+  const tags = new Map<string, string>();
 
   for (const [key, tagValue] of Object.entries(record)) {
     if (typeof tagValue === 'string') {
-      tags[key.slice(0, 120)] = tagValue.slice(0, 240);
+      tags.set(key.slice(0, 120), tagValue.slice(0, 240));
     }
   }
 
-  return tags;
+  return Object.fromEntries(tags);
 }
 
 function parseObject(value: unknown, field: string): Record<string, unknown> {
@@ -4788,11 +4791,13 @@ function invoiceGradeArtifactRegister(
   const verifiedCount = artifacts.filter(
     (artifact) => artifact.verificationStatus === 'verified',
   ).length;
-  const artifactCountsByType = artifacts.reduce<Record<string, number>>((counts, artifact) => {
-    counts[artifact.type] = (counts[artifact.type] ?? 0) + 1;
-
-    return counts;
-  }, {});
+  // Artifact types originate from uploads: count through a Map (no prototype keys).
+  const artifactCountsByType = Object.fromEntries(
+    artifacts.reduce((counts, artifact) => {
+      counts.set(artifact.type, (counts.get(artifact.type) ?? 0) + 1);
+      return counts;
+    }, new Map<string, number>()),
+  );
   let reviewNotRequestedCount = 0;
   let reviewPendingCount = 0;
   let reviewApprovedCount = 0;

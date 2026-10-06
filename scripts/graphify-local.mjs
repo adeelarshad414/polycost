@@ -211,7 +211,8 @@ function mermaidId(id) {
 }
 
 function escapeMermaid(value) {
-  return value.replace(/"/g, '\\"');
+  // Backslashes first, or an input ending in `\` would escape our own quote.
+  return value.replace(/\\/g, '\\\\').replace(/"/g, '\\"');
 }
 
 function fail(message) {
