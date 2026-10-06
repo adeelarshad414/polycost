@@ -79,10 +79,21 @@ describe('MVP acceptance criteria E2E', () => {
   });
 
   it('refreshes an existing comparison against the current pricing catalog', async () => {
+    // ADR-0001 §3.4: refreshing anonymous data needs its edit key.
+    const writeKey = (structuredComparison as ComparisonResult & { writeKey?: string }).writeKey;
+    expect(writeKey).toEqual(expect.any(String));
+    expect(
+      (
+        await requestRaw(`/comparisons/${structuredComparison.comparisonId}/refresh-live`, {
+          method: 'POST',
+        })
+      ).status,
+    ).toBe(403);
     const refreshed = await requestJson<ComparisonResult>(
       `/comparisons/${structuredComparison.comparisonId}/refresh-live`,
       {
         method: 'POST',
+        headers: { 'x-polycost-write-key': writeKey ?? '' },
       },
     );
 
