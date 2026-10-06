@@ -15,7 +15,7 @@
 // Custom format (-Fc) rather than plain SQL: it is compressed, and pg_restore
 // can then run in parallel and be selective if only part of the data is needed.
 import { spawnSync } from 'node:child_process';
-import { mkdirSync, statSync } from 'node:fs';
+import { closeSync, mkdirSync, openSync, statSync } from 'node:fs';
 import path from 'node:path';
 
 const args = parseArgs(process.argv.slice(2));
@@ -64,19 +64,21 @@ console.log(`  ${globalsPath} (${globalsBytes} bytes)`);
 console.log(JSON.stringify({ dump: dumpPath, globals: globalsPath, stamp }));
 
 function writeThroughDocker(target, dockerArgs, label) {
-  const result = spawnSync('sh', ['-c', `docker ${dockerArgs.join(' ')} > ${quote(target)}`], {
-    encoding: 'utf8',
-    stdio: ['ignore', 'inherit', 'inherit'],
-  });
+  // No shell: arguments go to docker verbatim and stdout streams straight into
+  // the file, so a crafted --container or --database value cannot inject
+  // commands (CodeQL js/indirect-command-line-injection).
+  const output = openSync(target, 'w', 0o600);
+  let result;
+  try {
+    result = spawnSync('docker', dockerArgs, { stdio: ['ignore', output, 'inherit'] });
+  } finally {
+    closeSync(output);
+  }
 
   if (result.status !== 0) {
     console.error(`${label} failed with exit code ${result.status}.`);
     process.exit(1);
   }
-}
-
-function quote(value) {
-  return `'${value.replace(/'/g, `'\\''`)}'`;
 }
 
 function parseArgs(argv) {
