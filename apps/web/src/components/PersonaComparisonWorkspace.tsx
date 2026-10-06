@@ -13,6 +13,7 @@ import {
   ReportFormat,
 } from '../types';
 import { WorkloadFormState } from '../workload';
+import { Iris } from './brand/Iris';
 
 type PersonaViewMode = 'executive' | 'engineering';
 type SortKey = 'resourceName' | 'provider' | 'region' | 'spec' | 'monthlyCost';
@@ -739,6 +740,7 @@ function SharedComparisonState({
         role="status"
       >
         <div className="flex items-start gap-3 rounded-lg border border-border bg-surface-1 p-4 sm:col-span-3">
+          <Iris pose="analysing" size={84} />
           <LoadingStatus
             title="Refreshing pricing evidence"
             detail="Mapping provider SKUs, totals, export links, and engineering rows from the backend response."
@@ -754,7 +756,7 @@ function SharedComparisonState({
   if (!data.comparisonId) {
     return (
       <div className="grid gap-4 rounded-lg border border-dashed border-border bg-surface-1 p-5 text-sm text-text-secondary sm:grid-cols-[auto_1fr_auto] sm:items-center">
-        <EmptyComparisonIllustration />
+        <Iris pose="welcome" size={120} />
         <div className="min-w-0">
           <strong className="block text-base font-semibold text-text-primary">
             Ready to compare
@@ -793,36 +795,16 @@ function SharedComparisonState({
       </div>
       {data.warningMessages.length > 0 ? (
         <div
-          className="rounded-md border border-[color:var(--warning)] bg-[color:var(--warning-soft)] p-2 text-text-primary"
+          className="flex items-start gap-3 rounded-md border border-[color:var(--warning)] bg-[color:var(--warning-soft)] p-2 text-text-primary"
           role="alert"
         >
-          <strong>Pricing warnings:</strong> {data.warningMessages.join(' ')}
+          <Iris pose="warning" size={84} />
+          <p className="m-0 min-w-0">
+            <strong>Pricing warnings:</strong> {data.warningMessages.join(' ')}
+          </p>
         </div>
       ) : null}
     </div>
-  );
-}
-
-function EmptyComparisonIllustration() {
-  return (
-    <svg
-      viewBox="0 0 80 80"
-      aria-hidden="true"
-      className="comparison-empty-illustration h-20 w-20 text-text-secondary"
-      fill="none"
-    >
-      <path
-        d="M25.5 51.5H55a12.5 12.5 0 0 0 1.6-24.9A17 17 0 0 0 23.4 31 10.6 10.6 0 0 0 25.5 51.5Z"
-        stroke="currentColor"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-        strokeWidth="3"
-      />
-      <path d="M27 61h26M32 68h16" stroke="currentColor" strokeLinecap="round" strokeWidth="3" />
-      <circle cx="32" cy="42" r="2.5" fill="currentColor" />
-      <circle cx="40" cy="42" r="2.5" fill="currentColor" />
-      <circle cx="48" cy="42" r="2.5" fill="currentColor" />
-    </svg>
   );
 }
 

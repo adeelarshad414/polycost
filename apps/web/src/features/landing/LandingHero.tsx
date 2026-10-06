@@ -1,6 +1,7 @@
 import { ProviderComparisonBar } from '../../charts';
 import { Button } from '../../components/Button';
 import { CompareIcon, UploadIcon } from '../../components/icons';
+import { Iris } from '../../components/brand/Iris';
 import { Badge } from '../../components/ui';
 import type { DataHealthResponse } from '../../types';
 
@@ -33,7 +34,10 @@ export function LandingHero({
   return (
     <section className="home-hero" aria-labelledby="page-title">
       <div className="home-hero-copy">
-        <span className="home-hero-eyebrow">Multi-cloud cost comparison</span>
+        <div className="home-hero-intro">
+          <Iris pose="welcome" size={96} className="home-hero-iris" />
+          <span className="home-hero-eyebrow">Multi-cloud cost comparison</span>
+        </div>
         <h1 id="page-title">{title}</h1>
         <p className="home-hero-subtitle">{subtitle}</p>
         <div className="home-hero-actions">

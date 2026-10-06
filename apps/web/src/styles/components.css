@@ -316,3 +316,38 @@
 .ui-empty-action {
   margin-top: var(--space-1);
 }
+
+/*
+  Iris mascot. Decorative and inline; the SVG carries its own width/height
+  attributes so nothing shifts layout. The sticker tile is on in dark mode by
+  default (both the OS preference and the toggle), off in light.
+*/
+.iris {
+  display: inline-flex;
+  flex: none;
+  line-height: 0;
+}
+
+.iris svg {
+  display: block;
+}
+
+.iris--tile-on {
+  border-radius: var(--iris-tile-radius);
+  background-color: var(--iris-body);
+  padding: 6px;
+}
+
+:root[data-theme='dark'] .iris--tile-auto {
+  border-radius: var(--iris-tile-radius);
+  background-color: var(--iris-body);
+  padding: 6px;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:where(:not([data-theme='light'])) .iris--tile-auto {
+    border-radius: var(--iris-tile-radius);
+    background-color: var(--iris-body);
+    padding: 6px;
+  }
+}

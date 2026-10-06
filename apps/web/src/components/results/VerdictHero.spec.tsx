@@ -25,6 +25,22 @@ const result = comparison([
 ]);
 
 describe('VerdictHero', () => {
+  // Iris rule: beside a named provider she only ever analyses; she never
+  // celebrates or "picks" a winner. The unpriced fallback uses the warning pose.
+  it('shows Iris analysing beside the verdict, and warning when nothing is priced', () => {
+    const { container, rerender } = render(<VerdictHero comparison={result} />);
+    const poses = () =>
+      [...container.querySelectorAll('svg[data-iris-pose]')].map((svg) =>
+        svg.getAttribute('data-iris-pose'),
+      );
+
+    expect(poses()).toEqual(['analysing']);
+
+    rerender(<VerdictHero comparison={comparison([])} />);
+    expect(poses()).toEqual(['warning']);
+    expect(screen.getByText('No provider could be priced for this workload.')).toBeTruthy();
+  });
+
   it('ranks quotes cheapest first without summing them', () => {
     expect(rankedQuotes(result).map((quote) => quote.providerId)).toEqual(['azure', 'aws', 'gcp']);
   });

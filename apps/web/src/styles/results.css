@@ -31,6 +31,21 @@
   background: var(--grad-brand-line);
 }
 
+/* Iris (analysing pose) sits left of the verdict; the verdict text stays the hero. */
+.verdict-hero--with-iris {
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: center;
+  column-gap: var(--space-4);
+}
+
+.verdict-hero--with-iris > .verdict-actions {
+  grid-column: 1 / -1;
+}
+
+.verdict-iris {
+  align-self: start;
+}
+
 .verdict-copy {
   display: grid;
   min-width: 0;
@@ -191,6 +206,16 @@
 }
 
 @media (max-width: 720px) {
+  /* Phones: Iris sits above the verdict so the title and price keep the full width. */
+  .verdict-hero--with-iris {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .verdict-iris svg {
+    width: 84px;
+    height: 84px;
+  }
+
   .verdict-hero {
     padding: var(--space-3);
   }
