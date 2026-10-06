@@ -54,6 +54,24 @@
   --provider-gcp-tint: #e4f4eb;
   --provider-on-solid: #0a0b14;
   --provider-gcp-logo-blue: #4285f4;
+
+  /*
+    Iris mascot (line art v1). Ink, body, tint and accent stay the same in dark
+    mode on purpose: Iris is line art for a light body and sits on a white
+    sticker tile in dark mode. Beams and sparks reference Aurora tokens, so they
+    follow the theme. Provider colours appear on the three beams only.
+  */
+  --iris-ink: #14123a;
+  --iris-body: #ffffff;
+  --iris-tint: #eef0ff;
+  --iris-accent: #4f46e5;
+  --iris-beam-aws: var(--provider-aws);
+  --iris-beam-azure: var(--provider-azure);
+  --iris-beam-gcp: var(--provider-gcp);
+  --iris-spark-1: var(--brand-violet);
+  --iris-spark-2: var(--brand-magenta);
+  --iris-spark-3: var(--brand-cyan);
+  --iris-tile-radius: 13%;
   --cat-compute: #4a3aa7;
   --cat-storage: #1baf7a;
   --cat-database: #eda100;

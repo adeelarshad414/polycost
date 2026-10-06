@@ -207,6 +207,13 @@ test('leads results with the verdict and keeps evidence collapsed (UI-4)', async
     await expect(page.getByText('Evidence and assumptions')).toBeVisible();
     await expect(page.getByText('Cost composition waterfall')).toBeHidden();
     await expectNoClippedContent(page);
+
+    // Iris: analysing beside the verdict, never inside a chart or a table.
+    await expect(page.locator('.verdict-hero svg[data-iris-pose]')).toHaveAttribute(
+      'data-iris-pose',
+      'analysing',
+    );
+    await expect(page.locator('.chart-frame .iris, table .iris, .iris [tabindex]')).toHaveCount(0);
   }
 });
 

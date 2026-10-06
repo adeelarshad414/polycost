@@ -26,6 +26,11 @@ once tagged releases begin.
 
 ### Added
 
+- Iris, the PolyCost mascot (line art v1): five poses, a token-only `<Iris />` component,
+  and placements in the landing hero, first-run, comparison loading, verdict card and
+  pricing warnings. Brand rules are tested (equal beams, provider colours on the beams
+  only, sparks only when celebrating, no inline styles) and linted (never in charts).
+  +2.1 KB gzip.
 - Backup and DR (H-16): recovery objectives per data class
   (`docs/BACKUP-AND-DR.md`); `polycost-backup` / `polycost-restore` in the
   database tools image (roles + `pg_dump -Fc`, sha256 manifest, age encryption

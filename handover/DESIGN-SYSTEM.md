@@ -29,6 +29,7 @@ weights and radii.
 | Brand      | `--brand-primary`, `-hover`, `-active`, `-soft`, `--brand-violet/magenta/cyan`                                                    | Magenta and cyan are decorative only                      |
 | Status     | `--success`, `--warning`, `--danger`, `--info`, `--estimate`, each with `-soft`                                                   | Always paired with an icon or a label                     |
 | Providers  | `--provider-aws/azure/gcp` (fills), `-ink` (text), `-tint`, `-soft`                                                               | Identity only; CVD-validated, not the vendor hex          |
+| Mascot     | `--iris-ink/-body/-tint/-accent`, `--iris-beam-aws/-azure/-gcp` (→ provider fills), `--iris-spark-1..3` (→ violet/magenta/cyan)   | Iris only; see below                                      |
 | Categories | `--cat-compute … --cat-operations`                                                                                                | Fixed order; never a provider hue                         |
 | Data ramps | `--seq-1…10` (+ `--seq-ink-strong` from step 6), `--div-under-1…3`, `--div-mid`, `--div-over-1…3`                                 | Magnitude and variance                                    |
 | Gradients  | `--grad-cta`, `--grad-cta-hover`, `--grad-brand-line`, `--grad-hero-mesh`, `--grad-kpi-*`, `--grad-glass`, `--grad-skeleton`      | Text only on `--grad-cta`                                 |
@@ -49,6 +50,7 @@ weights and radii.
 | `features/landing/LandingHero`                                                                                                                                | Promise, two calls to action, live proof points, labelled sample result                          |
 | `features/workspace/WorkspaceOverview`                                                                                                                        | Signed-in landing: team, invites, invoice variance, activity                                     |
 | `ThemeSwitcher`                                                                                                                                               | Light/Dark/System segmented control                                                              |
+| `brand/Iris`                                                                                                                                                  | Decorative mascot (`pose`, `size`, `tile`). Never in charts, tables, login or destructive UI     |
 | `TopLoadingBar`, `LoadingExperience`                                                                                                                          | Page progress and boot/session/skeleton states                                                   |
 
 ## Data-visualisation grammar
@@ -66,6 +68,61 @@ weights and radii.
 7. Text uses text tokens, never the series colour.
 
 These rules are enforced by tests in `apps/web/src/charts/charts.spec.tsx`.
+
+## Illustration: Iris
+
+Iris is the PolyCost mascot: a gem-bodied owl, the "cloud navigator". Her belly is a
+diamond prism. One indigo beam goes in, and three **equal** beams come out, one per
+provider. That is the product in one picture: one workload, three clouds. She is calm and
+precise, she shows the evidence, and she never cheers for a vendor. The art is flat line
+art (**v1**) on a 240×240 viewBox. The source files are `apps/web/public/brand/iris/`
+(standalone SVGs with colour fallbacks, for the README and social posts). The app renders
+`components/brand/Iris.tsx` from `iris-art.ts`, which is generated from those files and
+contains no hex values.
+
+| Pose                                                                             | Use                                                                                     |
+| -------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------- |
+| ![welcome](../apps/web/public/brand/iris/iris-welcome.svg) `welcome`             | Landing hero, first-run "Ready to compare"                                              |
+| ![analysing](../apps/web/public/brand/iris/iris-analysing.svg) `analysing`       | Comparison loading, results verdict card                                                |
+| ![verdict](../apps/web/public/brand/iris/iris-verdict.svg) `verdict`             | "Results ready" toasts and onboarding illustrations only; never beside a named provider |
+| ![warning](../apps/web/public/brand/iris/iris-warning.svg) `warning`             | Pricing warnings, "No provider could be priced"                                         |
+| ![celebrating](../apps/web/public/brand/iris/iris-celebrating.svg) `celebrating` | Success moments (export complete). Not yet placed: no success surface exists            |
+
+**Rules** (each enforced where possible):
+
+1. **The three exit beams are always equal** in length, width and opacity. No prop can
+   recolour, resize or hide a beam. This is checked from the path data in `iris.spec.tsx`.
+   Any new pose must keep this rule.
+2. **Never inside a chart** (an ESLint `no-restricted-imports` rule covers `src/charts` and the
+   legacy chart files) or a table (an e2e check). The verdict card uses `analysing` only
+   (a unit test).
+3. **Provider colours appear only on the beams** and the refraction lines inside the prism
+   (a unit test).
+4. **No provider colours for status.** The warning pose uses ink and indigo; red is reserved
+   for errors, and Iris carries none.
+5. **Sparks** (violet, magenta, cyan) appear on `celebrating` only (a unit test).
+6. **Not in security-critical or destructive UI:** login, the share-link password form,
+   `ConfirmDialog`.
+7. **Decorative:** always `aria-hidden`, never focusable. The surrounding text carries the meaning.
+
+| Prop        | Type                                                        | Default           | Notes                                                                               |
+| ----------- | ----------------------------------------------------------- | ----------------- | ----------------------------------------------------------------------------------- |
+| `pose`      | `welcome \| analysing \| verdict \| warning \| celebrating` | required          |                                                                                     |
+| `size`      | number (px)                                                 | 120               | Clamped to ≥ 48. Use 48 (inline hint), 84 (mobile card), 120, 150 (verdict) or 240+ |
+| `tile`      | boolean                                                     | follows the theme | White sticker tile; on in dark mode, off in light, decided in CSS                   |
+| `className` | string                                                      |                   | Layout only; never colour                                                           |
+
+| Placement                                                      | Pose        | Size     |
+| -------------------------------------------------------------- | ----------- | -------- |
+| Landing hero, beside the eyebrow                               | `welcome`   | 96       |
+| First-run "Ready to compare"                                   | `welcome`   | 120      |
+| Comparison loading                                             | `analysing` | 84       |
+| Results verdict card (left of the verdict; above it on phones) | `analysing` | 150 / 84 |
+| "No provider could be priced"                                  | `warning`   | 110      |
+| Pricing warnings alert                                         | `warning`   | 84       |
+
+The art uses presentation attributes only (no `style`), so the build-generated CSP stays
+strict. Dark mode keeps the light body on a white tile rather than recolouring her.
 
 ## Content and voice
 

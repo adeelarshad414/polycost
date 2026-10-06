@@ -54,6 +54,16 @@ each has a `-soft` background. Always pair a status colour with an icon or a lab
 The logomark is three ascending rounded vertical bars in the provider fills
 (AWS, Azure, GCP). The SVGs in `apps/web/public/brand/` use the Aurora values above.
 
+## Mascot: Iris
+
+Iris is a gem-bodied owl whose prism splits one indigo beam into three equal provider
+beams: one workload, three clouds. She is decorative, neutral (she never favours a
+provider) and appears in the empty, loading, warning and verdict states. The art, the
+rules and the placements are in
+[handover/DESIGN-SYSTEM.md](handover/DESIGN-SYSTEM.md#illustration-iris). For the README
+and social posts, use the SVGs in `apps/web/public/brand/iris/` (export a PNG from them;
+don't redraw her).
+
 ## Typography
 
 Fonts are self-hosted through `@fontsource` packages imported in `apps/web/src/main.tsx`:

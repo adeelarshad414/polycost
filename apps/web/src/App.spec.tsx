@@ -2505,7 +2505,8 @@ describe('ComparisonView', () => {
     expect(text(container)).toContain('Describe infrastructure');
     expect(text(container)).toContain('Add services to see your comparison');
     expect(text(container)).toContain('Add services');
-    expect(container.querySelector('.comparison-empty-illustration')).toBeInstanceOf(SVGSVGElement);
+    // The first-run state shows Iris in her welcome pose (decorative, aria-hidden).
+    expect(container.querySelector('svg[data-iris-pose="welcome"]')).toBeInstanceOf(SVGSVGElement);
     expect(container.querySelector('.engineering-empty-illustration')).toBeInstanceOf(
       SVGSVGElement,
     );

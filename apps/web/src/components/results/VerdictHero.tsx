@@ -2,6 +2,7 @@ import type { ReactNode } from 'react';
 import { useCountUp } from '../../hooks/useCountUp';
 import { formatCurrency, formatPercent } from '../../lib/format';
 import type { ComparisonResult, DataHealthResponse, ProviderId } from '../../types';
+import { Iris } from '../brand/Iris';
 import { Badge, KpiTile, ProvenancePill } from '../ui';
 
 const PROVIDER_NAME = new Map<ProviderId, string>([
@@ -55,14 +56,17 @@ export function VerdictHero({
 
   if (!lowest) {
     return (
-      <section className="verdict-hero" aria-label="Comparison verdict">
+      <section className="verdict-hero verdict-hero--with-iris" aria-label="Comparison verdict">
+        <Iris pose="warning" size={110} className="verdict-iris" />
         <h2 className="verdict-title">No provider could be priced for this workload.</h2>
       </section>
     );
   }
 
   return (
-    <section className="verdict-hero" aria-label="Comparison verdict">
+    <section className="verdict-hero verdict-hero--with-iris" aria-label="Comparison verdict">
+      {/* The analysing pose only: Iris never celebrates beside a named provider. */}
+      <Iris pose="analysing" size={150} className="verdict-iris" />
       <div className="verdict-copy">
         <span className="verdict-eyebrow">
           <i
