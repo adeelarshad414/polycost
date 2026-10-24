@@ -20,7 +20,11 @@ RUN node scripts/write-security-headers.mjs dist/index.html /app/security-header
 FROM nginx:1.30-alpine
 # Pick up Alpine security fixes released after the base image was built; the
 # release workflow fails on any fixable HIGH/CRITICAL finding (audit H-13).
-RUN apk upgrade --no-cache
+# SECURITY_PATCH_STAMP changes every day in CI (release.yml), so this layer is
+# rebuilt instead of replayed from the build cache; a cached `apk upgrade`
+# silently kept packages from the day it was first cached.
+ARG SECURITY_PATCH_STAMP=local
+RUN echo "security patches: ${SECURITY_PATCH_STAMP}" && apk upgrade --no-cache
 COPY apps/web/nginx.conf /etc/nginx/conf.d/default.conf
 COPY --from=build /app/security-headers.conf /etc/nginx/snippets/security-headers.conf
 COPY --from=build /app/apps/web/dist /usr/share/nginx/html

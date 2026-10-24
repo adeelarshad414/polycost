@@ -25,10 +25,16 @@ COPY packages/types packages/types
 RUN npm ci --omit=dev --workspace @polycost/api --include-workspace-root=false \
   # The runtime only runs node. npm, npx and corepack are dead weight here, and
   # npm's bundled dependencies carry their own CVEs (audit H-13), so drop them
-  # once dependencies are installed. Also pick up Alpine security fixes.
+  # once dependencies are installed.
   && rm -rf /usr/local/lib/node_modules/npm /usr/local/lib/node_modules/corepack \
-     /usr/local/bin/npm /usr/local/bin/npx /usr/local/bin/corepack \
-  && apk upgrade --no-cache
+     /usr/local/bin/npm /usr/local/bin/npx /usr/local/bin/corepack
+
+# Pick up Alpine security fixes released after the base image was built.
+# SECURITY_PATCH_STAMP changes every day in CI (release.yml), so this layer is
+# rebuilt instead of replayed from the build cache; a cached `apk upgrade`
+# silently kept packages from the day it was first cached.
+ARG SECURITY_PATCH_STAMP=local
+RUN echo "security patches: ${SECURITY_PATCH_STAMP}" && apk upgrade --no-cache
 
 COPY --from=build --chown=node:node /app/apps/api/dist apps/api/dist
 COPY --chown=node:node apps/api/otel-register.mjs apps/api/otel-register.mjs

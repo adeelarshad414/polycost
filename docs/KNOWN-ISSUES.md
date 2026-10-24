@@ -262,6 +262,15 @@ runner rather than the module system: TypeScript 7 is the native compiler and
 does not expose the JavaScript compiler API `ts-jest` needs. `ts-jest@29.4.12`,
 the latest, declares `typescript: ">=4.3 <7"`. Revisit when ts-jest supports 7.
 
+**Update (2026-10-25):** typescript-eslint (<6.1) does not support 7 either.
+`.github/dependabot.yml` now ignores `typescript >=6.1.0`, so the queue stops
+reopening the bump. Remove that ignore when both tools declare support. The same
+file pins Docker images to the Node LTS line CI runs (`node >=25` ignored, audit
+M-16). It also gives Playwright and `github/codeql-action` their own update
+groups, because each must move in lockstep with something outside npm: the
+pinned Playwright CI image and its screenshot baselines, and the CodeQL
+init/analyze pair.
+
 ---
 
 ### Original analysis (2026-08-31), kept for the reasoning
