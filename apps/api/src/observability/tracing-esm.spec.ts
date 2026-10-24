@@ -51,12 +51,17 @@ describe('OpenTelemetry ESM instrumentation', () => {
       `,
     );
 
-    const out = execFileSync(
-      process.execPath,
-      ['--import', join(dir, 'register.mjs'), join(dir, 'probe.mjs')],
-      { cwd: apiRoot, encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] },
-    ).trim();
-    rmSync(dir, { recursive: true, force: true });
+    let out: string;
+    try {
+      out = execFileSync(
+        process.execPath,
+        ['--import', join(dir, 'register.mjs'), join(dir, 'probe.mjs')],
+        { cwd: apiRoot, encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] },
+      ).trim();
+    } finally {
+      // A failing child used to leave the directory behind inside the repo.
+      rmSync(dir, { recursive: true, force: true });
+    }
 
     expect(out).toBe('outgoingGetRequest');
   });

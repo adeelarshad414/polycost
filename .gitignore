@@ -31,3 +31,6 @@ backups/
 
 # Lighthouse CI output
 .lighthouseci/
+
+# Scratch directory of tracing-esm.spec.ts (removed after each run)
+.otel-esm-check-*/
