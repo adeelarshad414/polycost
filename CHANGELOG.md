@@ -9,6 +9,11 @@ once tagged releases begin.
 
 ### Security
 
+- Release images re-apply Alpine security fixes at least daily: the `apk upgrade`
+  layers in the api, web and migrations images take a `SECURITY_PATCH_STAMP` build
+  arg (the UTC date in `release.yml`), so the GHA build cache can no longer replay a
+  stale upgrade layer and miss a fixed CVE (libtiff CVE-2026-4775 slipped through
+  this way). zod moves to 4.6.7 (CVE-2023-54404).
 - Edit keys and claiming, ADR-0001 step 2 (P2-1b): anonymous comparisons and workloads
   get a one-time 256-bit edit key (stored as sha256, migration 044); changing them -
   budgets, alerts, share links, live refresh - needs it, closing the "anyone with the
