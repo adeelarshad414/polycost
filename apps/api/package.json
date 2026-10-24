@@ -34,7 +34,7 @@
     "@opentelemetry/semantic-conventions": "^1.43.0",
     "@polycost/types": "0.1.0",
     "bullmq": "^6.3.10",
-    "ioredis": "^5.10.1",
+    "ioredis": "^6.0.0",
     "pg": "^8.23.0",
     "pino": "^10.3.1",
     "prom-client": "^15.1.3",
