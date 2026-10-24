@@ -68,6 +68,12 @@ jobs:
             exit 1
           fi
 
+      # One value per UTC day: invalidates only the `apk upgrade` layers, so OS
+      # security fixes are applied at least daily while the rest stays cached.
+      - name: Security patch stamp
+        id: stamp
+        run: echo "value=$(date -u +%Y-%m-%d)" >> "$GITHUB_OUTPUT"
+
       - uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
 
       - id: meta
@@ -90,7 +96,9 @@ jobs:
         with:
           context: .
           file: ${{ matrix.dockerfile }}
-          build-args: ${{ matrix.build-args }}
+          build-args: |
+            ${{ matrix.build-args }}
+            SECURITY_PATCH_STAMP=${{ steps.stamp.outputs.value }}
           load: true
           push: false
           tags: polycost-${{ matrix.name }}:scan
@@ -121,7 +129,9 @@ jobs:
         with:
           context: .
           file: ${{ matrix.dockerfile }}
-          build-args: ${{ matrix.build-args }}
+          build-args: |
+            ${{ matrix.build-args }}
+            SECURITY_PATCH_STAMP=${{ steps.stamp.outputs.value }}
           push: true
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
