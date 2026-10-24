@@ -130,10 +130,11 @@ export function safeFileName(fileName: string | undefined): string | undefined {
 }
 
 function decodeHtmlEntities(value: string): string {
+  // `&amp;` is decoded LAST: decoding it first turns `&amp;quot;` into `&quot;`
+  // and then into `"`, unescaping twice (CodeQL js/double-escaping).
   return value
     .replace(/&lt;/g, '<')
     .replace(/&gt;/g, '>')
-    .replace(/&amp;/g, '&')
     .replace(/&quot;/g, '"')
     .replace(/&#39;/g, "'")
     .replace(/&#x([0-9a-f]+);/gi, (_, hex: string) =>
@@ -141,7 +142,8 @@ function decodeHtmlEntities(value: string): string {
     )
     .replace(/&#(\d+);/g, (_, decimal: string) =>
       String.fromCodePoint(Number.parseInt(decimal, 10)),
-    );
+    )
+    .replace(/&amp;/g, '&');
 }
 
 function removeControlCharacters(value: string): string {

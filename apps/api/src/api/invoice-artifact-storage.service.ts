@@ -602,12 +602,18 @@ function objectKey(input: {
 }
 
 function safeObjectSegment(value: string): string {
-  return value
+  // Bounded before any regex, and dashes trimmed with a linear scan: `/-+$/`
+  // is polynomial on a long run of '-' (CodeQL js/polynomial-redos).
+  const cleaned = value
+    .slice(0, 512)
     .trim()
     .toLowerCase()
-    .replace(/[^a-z0-9._=-]+/g, '-')
-    .replace(/^-+|-+$/g, '')
-    .slice(0, 180);
+    .replace(/[^a-z0-9._=-]+/g, '-');
+  let start = 0;
+  let end = cleaned.length;
+  while (start < end && cleaned[start] === '-') start += 1;
+  while (end > start && cleaned[end - 1] === '-') end -= 1;
+  return cleaned.slice(start, end).slice(0, 180);
 }
 
 function objectPath(key: string): string {
