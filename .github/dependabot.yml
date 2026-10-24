@@ -12,6 +12,11 @@ updates:
       # (<6.1) or ts-jest (<7) yet. Remove when both declare support.
       - dependency-name: typescript
         versions: ['>=6.1.0']
+      # OpenTelemetry JS 3 (core 3, SDK 0.300) is not supported by @sentry/node-core
+      # or @google-cloud/opentelemetry-resource-util yet, both pinned to core 2
+      # through the root overrides. Patches only until they move (KNOWN-ISSUES K-11).
+      - dependency-name: '@opentelemetry/*'
+        update-types: ['version-update:semver-minor', 'version-update:semver-major']
     groups:
       # The visual job runs in a digest-pinned mcr.microsoft.com/playwright image
       # (ci.yml) whose browser build must match @playwright/test, and a new

@@ -271,6 +271,14 @@ groups, because each must move in lockstep with something outside npm: the
 pinned Playwright CI image and its screenshot baselines, and the CodeQL
 init/analyze pair.
 
+**Update (2026-10-25, #284):** OpenTelemetry JS 3 is held as well. SDK 0.300
+requires `@opentelemetry/core` 3.0.0, but `@sentry/node-core` and
+`@google-cloud/opentelemetry-resource-util` still declare core 2. The root
+`overrides` keep a single core 2 copy, so the new SDK failed to load
+(`AddAttributeDecision` missing) and the observability suites broke. Dependabot
+now takes patch updates only for `@opentelemetry/*`. Lift that ignore, together
+with the `overrides`, once both packages support core 3.
+
 ---
 
 ### Original analysis (2026-08-31), kept for the reasoning
