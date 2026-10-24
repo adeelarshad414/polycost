@@ -178,6 +178,80 @@ say so explicitly rather than marking it done.
 | Phase V3.5 - Terraform bundle integrity validation      | Complete with known gaps (see notes) | 2026-07-08   |
 | Phase V3.6 - Terraform validation evidence              | Complete with known gaps (see notes) | 2026-07-09   |
 | Phase V3.7 - Terraform destination evidence capture     | Complete with known gaps (see notes) | 2026-07-09   |
+| Audit remediation - Phase 0 (stop-the-bleed)            | Complete                             | 2026-10-02   |
+| Audit remediation - Phase UI-0 to UI-8 (Aurora)         | Complete                             | 2026-10-02   |
+| Audit remediation - Phase 1 (production foundations)    | Complete                             | 2026-10-05   |
+| Audit remediation - Phase 2 (correctness and tenancy)   | In progress (P2-1a, P2-1b done)      | 2026-10-25   |
+| Audit remediation - Phase 3 (architecture and scale)    | Not started                          | 2026-10-25   |
+
+## Audit remediation programme (audit of 2026-09-30)
+
+The roadmap is section 6 (and 9.5 / 11 for UI) of `polycost-audit-2026-09-30.md`,
+kept outside this repository. This section is the current snapshot; it is rewritten
+in place as work lands, and the dated log below it is append-only.
+
+### Overall: about 42% by effort, 70% by work item (2026-10-25)
+
+| Phase                               | Work items       |     Done | Effort (est.)   | Status                                                          |
+| ----------------------------------- | ---------------- | -------: | --------------- | --------------------------------------------------------------- |
+| 0 - Stop-the-bleed                  | 12 actions       |       12 | ~1 week         | ✅ Complete (#244, #249) - gate "safe to demo" met              |
+| UI-0 to UI-8 - Aurora visual system | 9 phases         |        9 | ~7.5 weeks      | ✅ Complete (#236-#248)                                         |
+| 1 - Production foundations          | 8 (P1-1 to P1-8) |        8 | ~4 weeks        | ✅ Complete (#250, #256-#263) - gate "safe to deploy" met in CI |
+| 2 - Correctness and tenancy         | 8 workstreams    |      0.4 | ~6 weeks        | 🟡 In progress - tenancy (P2-1) is 2 of 5 steps                 |
+| 3 - Architecture and sustainability | 5 workstreams    |        0 | ~12 weeks       | ⬜ Not started                                                  |
+| **Total**                           | **42**           | **29.4** | **~30.5 weeks** | **~42% of effort, 70% of items**                                |
+
+The two figures differ because the remaining phases are the large ones: Phase 2
+and 3 are 13 of the 42 items but about 18 of the 30.5 estimated weeks. Use the
+effort figure for planning.
+
+### Done
+
+- **Phase 0** (12 of 12): mock pricing off in production (C-01), auth input caps
+  and uniform login errors, trusted-proxy rate limiting, SCIM containment,
+  dev-only compose binding, migration initdb fix, NetworkPolicy, pricing-fallback
+  telemetry, Node 24 images, branch protection.
+- **UI-0 to UI-8** (9 of 9): misleading visuals removed, Aurora tokens with
+  light/dark/system theming, component library, chart system, answer-first
+  results dashboard, workspace overview, landing and onboarding, motion and
+  accessibility gates with visual regression, brand exports. Iris mascot added
+  (#266).
+- **Phase 1** (8 of 8): blocking secret, dependency, IaC and CodeQL scans with
+  SHA-pinned actions (P1-1); strict CSP and security headers (P1-2); ETL that cannot
+  wipe the catalog (P1-3); hashed share-link tokens (P1-4); bounded pools, BullMQ
+  retries and DB-driven readiness (P1-5); a checksummed, lock-protected migrator
+  (P1-6); scanned, signed, attested images and a digest-pinned Helm chart (P1-7);
+  RPO/RTO, encrypted off-site backups and a nightly restore drill (P1-8).
+- **Phase 2 so far**: ADR-0001 tenancy model accepted (#264); P2-1a enforcement
+  foundation - every route classified and core routes through
+  `ResourceAccessService` (#269); P2-1b edit keys and claiming for anonymous data
+  (#270).
+- **Hygiene since then**: CodeQL triage, six findings fixed and the rest dismissed
+  with reasons (#271); release images re-apply Alpine security fixes daily and zod
+  4.6.7 (#281); Dependabot: Actions bumps (#272, #275) and ioredis 6 (#233)
+  merged; TypeScript 7 and Node 26 held, Playwright and CodeQL actions grouped
+  (#279, #286).
+
+### What next
+
+1. **Close out the Dependabot queue** (on auto-merge, waiting for green CI): CodeQL
+   init/analyze together (#285), the npm minor/patch group with Playwright 1.64.1
+   and its CI image (#284), and setup-node 7.1.0 (#274) once Dependabot recreates
+   it.
+2. **P2-1c** - anonymous data retention: 30 days, then a 60-day grace.
+3. **P2-1d** - web tenancy UI: edit-key copy, claim into a team, viewer read-only.
+4. **P2-1e** - tenancy docs; closes H-04.
+5. **Rest of Phase 2**, in roadmap order: SCIM verified domains (H-01), cookie
+   sessions with CSRF (H-05 part 2), pricing truth with a nightly golden set
+   (H-10, H-12), money as integer micro-dollars (M-04), Testcontainers
+   integration tests (H-11), zod-to-OpenAPI contracts (M-08), safe VSDX parsing
+   (M-03).
+6. **Phase 3**: enterprise-module scope ADR, backend modularisation, frontend
+   re-architecture, one runtime target in IaC, governance.
+
+**Owner actions outstanding**: cut the first signed release (v0.2.0); run
+`npm run db:migrate` locally for migrations 043 and 044; free Colima disk space.
+The legacy share-hash removal is scheduled after 2027-01-01.
 
 ## Phase 2.56 - VSDX visual evidence verification
 

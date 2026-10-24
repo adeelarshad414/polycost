@@ -7,8 +7,34 @@ updates:
       day: monday
       time: '09:00'
     open-pull-requests-limit: 5
+    ignore:
+      # TypeScript 7 (the native compiler) is not supported by typescript-eslint
+      # (<6.1) or ts-jest (<7) yet. Remove when both declare support.
+      - dependency-name: typescript
+        versions: ['>=6.1.0']
+      # OpenTelemetry JS 3 (core 3, SDK 0.300) is not supported by @sentry/node-core
+      # or @google-cloud/opentelemetry-resource-util yet, both pinned to core 2
+      # through the root overrides. Patches only until they move (KNOWN-ISSUES K-11).
+      - dependency-name: '@opentelemetry/*'
+        update-types: ['version-update:semver-minor', 'version-update:semver-major']
     groups:
+      # The visual job runs in a digest-pinned mcr.microsoft.com/playwright image
+      # (ci.yml) whose browser build must match @playwright/test, and a new
+      # Chromium can move the screenshot baselines. So Playwright arrives on its
+      # own PR: bump the image with it (and the baselines if they move), leaving
+      # the rest of the npm group unblocked.
+      playwright:
+        patterns:
+          - '@playwright/test'
+          - playwright
+          - playwright-core
       npm-minor-and-patch:
+        # Group order alone did not keep Playwright out of this group (#284),
+        # so exclude it explicitly.
+        exclude-patterns:
+          - '@playwright/test'
+          - playwright
+          - playwright-core
         update-types:
           - minor
           - patch
@@ -20,15 +46,27 @@ updates:
       day: monday
       time: '09:00'
     open-pull-requests-limit: 5
+    groups:
+      # init and analyze must run the same CodeQL version; separate PRs each
+      # fail the analyze check.
+      codeql-action:
+        patterns:
+          - github/codeql-action*
 
-  # Base images in the Dockerfiles (node, nginx).
+  # Base images in the Dockerfiles (node, nginx, alpine).
   - package-ecosystem: docker
     directories:
       - /apps/api
       - /apps/web
       - /docker/notary-receiver
+      - /database
     schedule:
       interval: weekly
       day: monday
       time: '09:00'
     open-pull-requests-limit: 5
+    ignore:
+      # Images stay on the Node LTS line that CI runs (audit M-16). Move CI and
+      # every image together when the next LTS is chosen, not image by image.
+      - dependency-name: node
+        versions: ['>=25']

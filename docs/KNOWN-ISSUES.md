@@ -262,6 +262,23 @@ runner rather than the module system: TypeScript 7 is the native compiler and
 does not expose the JavaScript compiler API `ts-jest` needs. `ts-jest@29.4.12`,
 the latest, declares `typescript: ">=4.3 <7"`. Revisit when ts-jest supports 7.
 
+**Update (2026-10-25):** typescript-eslint (<6.1) does not support 7 either.
+`.github/dependabot.yml` now ignores `typescript >=6.1.0`, so the queue stops
+reopening the bump. Remove that ignore when both tools declare support. The same
+file pins Docker images to the Node LTS line CI runs (`node >=25` ignored, audit
+M-16). It also gives Playwright and `github/codeql-action` their own update
+groups, because each must move in lockstep with something outside npm: the
+pinned Playwright CI image and its screenshot baselines, and the CodeQL
+init/analyze pair.
+
+**Update (2026-10-25, #284):** OpenTelemetry JS 3 is held as well. SDK 0.300
+requires `@opentelemetry/core` 3.0.0, but `@sentry/node-core` and
+`@google-cloud/opentelemetry-resource-util` still declare core 2. The root
+`overrides` keep a single core 2 copy, so the new SDK failed to load
+(`AddAttributeDecision` missing) and the observability suites broke. Dependabot
+now takes patch updates only for `@opentelemetry/*`. Lift that ignore, together
+with the `overrides`, once both packages support core 3.
+
 ---
 
 ### Original analysis (2026-08-31), kept for the reasoning
