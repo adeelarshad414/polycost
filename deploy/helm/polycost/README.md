@@ -95,6 +95,12 @@ people compare without an account (capability URLs) while team data stays isolat
 `disabled` requires a session on every core route. Choose `disabled` for a hosted,
 multi-tenant service.
 
+Anonymous data expires `config.anonymousRetentionDays` (default 30) after it is
+created and reads as `404` from then on. Data that existed before expiry shipped
+gets `config.anonymousRetentionGraceDays` (default 60) from the first retention
+sweep. The sweep deletes expired rows only when `DATA_RETENTION_ENFORCEMENT_MODE`
+is `delete-expired`. Claiming data into a team removes its expiry.
+
 ## Database, Redis and workers
 
 - **Pools:** every pod opens four Postgres pools (`api`, `pricing_catalog`,

@@ -46,6 +46,8 @@ const configService = {
         return 730;
       case 'DATA_RETENTION_PRICING_ETL_RUN_DAYS':
         return 180;
+      case 'ANONYMOUS_RETENTION_GRACE_DAYS':
+        return 60;
       default:
         throw new Error(`Unexpected config key ${String(key)}`);
     }
@@ -154,7 +156,7 @@ describe('CostManagementJobsScheduler', () => {
       expect.objectContaining({
         mode: 'report-only',
         maxRowsPerTable: 50000,
-        windows: expect.objectContaining({ teamAuditEventDays: 2555 }),
+        windows: expect.objectContaining({ teamAuditEventDays: 2555, anonymousGraceDays: 60 }),
       }),
     );
   });

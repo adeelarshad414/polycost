@@ -155,6 +155,29 @@ describe('DomainMetricsService', () => {
     });
   });
 
+  describe('data retention', () => {
+    it('gauges what is eligible and counts what was deleted or stamped, per table', async () => {
+      const { domain, render } = build();
+
+      domain.recordDataRetentionSweep([
+        { table: 'workloads', eligibleRows: 4, deletedRows: 0, stampedRows: 2 },
+        { table: 'account_sessions', eligibleRows: 0, deletedRows: 0 },
+      ]);
+      domain.recordDataRetentionSweep([
+        { table: 'workloads', eligibleRows: 1, deletedRows: 3, stampedRows: 0 },
+      ]);
+
+      const rendered = await render();
+
+      // Eligible is the latest sweep's view, not a running total.
+      expect(rendered).toContain('data_retention_eligible_rows{table="workloads"} 1');
+      expect(rendered).toContain('data_retention_eligible_rows{table="account_sessions"} 0');
+      expect(rendered).toContain('data_retention_deleted_rows_total{table="workloads"} 3');
+      expect(rendered).toContain('data_retention_stamped_rows_total{table="workloads"} 2');
+      expect(samples(rendered, 'data_retention_deleted_rows_total')).toHaveLength(1);
+    });
+  });
+
   describe('vault, auth and exports', () => {
     it('separates vault successes from failures', async () => {
       const { domain, render } = build();

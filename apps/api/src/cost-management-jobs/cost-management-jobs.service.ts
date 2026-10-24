@@ -14,6 +14,7 @@ import {
   ShareLinkCleanupSummary,
 } from './cost-management-jobs.types.js';
 import { DataRetentionMode, DataRetentionWindows } from '../api/api-database.repository.js';
+import { DomainMetricsService } from '../observability/domain-metrics.service.js';
 
 const WEEK_IN_MS = 7 * 24 * 60 * 60 * 1000;
 
@@ -25,6 +26,7 @@ export class CostManagementJobsService {
     private readonly repository: ApiDatabaseRepository,
     private readonly exchangeRateClient: ExchangeRateClient,
     private readonly auditExportService?: TeamAuditExportService,
+    private readonly domainMetrics?: DomainMetricsService,
   ) {}
 
   async syncCurrencyRates(baseCurrency = 'USD'): Promise<CurrencySyncSummary> {
@@ -105,6 +107,7 @@ export class CostManagementJobsService {
       windows: options.windows,
       maxRowsPerTable: options.maxRowsPerTable,
     });
+    this.domainMetrics?.recordDataRetentionSweep(result.tables);
 
     this.logger.log(
       result.mode === 'delete-expired'

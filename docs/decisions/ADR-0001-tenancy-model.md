@@ -202,6 +202,12 @@ team's comparison". Read access alone can't claim.
    comparisons, enforcement on every change route, `POST …/claim`.
 3. **P2-1c Retention.** `ANONYMOUS_RETENTION_DAYS` in the scheduled retention sweep, with a grace
    period for existing rows, and metrics for what was pruned.
+   _As implemented (migration 045):_ the expiry is stamped on the row (`expires_at`) at
+   creation, so changing the setting affects new data only, and claiming clears it. An
+   expired row reads as `404` straight away, together with its share links and alerts;
+   deleting it follows the existing `DATA_RETENTION_ENFORCEMENT_MODE` opt-in, like every
+   other retention window. Existing rows are stamped with the grace period by the first
+   sweep that sees them, not by the migration, which keeps the migration catalog-only.
 4. **P2-1d Web.** Send the token on core calls, the Team comparisons list, ownership badges, clearing
    history and keys on logout, and a claim action.
 5. **P2-1e Docs.** Rewrite the README "Anonymous and Workspace Features" section and `11-SECURITY.md`

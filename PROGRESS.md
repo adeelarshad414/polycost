@@ -181,7 +181,7 @@ say so explicitly rather than marking it done.
 | Audit remediation - Phase 0 (stop-the-bleed)            | Complete                             | 2026-10-02   |
 | Audit remediation - Phase UI-0 to UI-8 (Aurora)         | Complete                             | 2026-10-02   |
 | Audit remediation - Phase 1 (production foundations)    | Complete                             | 2026-10-05   |
-| Audit remediation - Phase 2 (correctness and tenancy)   | In progress (P2-1a, P2-1b done)      | 2026-10-25   |
+| Audit remediation - Phase 2 (correctness and tenancy)   | In progress (P2-1a to P2-1c done)    | 2026-10-25   |
 | Audit remediation - Phase 3 (architecture and scale)    | Not started                          | 2026-10-25   |
 
 ## Audit remediation programme (audit of 2026-09-30)
@@ -197,9 +197,9 @@ in place as work lands, and the dated log below it is append-only.
 | 0 - Stop-the-bleed                  | 12 actions       |       12 | ~1 week         | ✅ Complete (#244, #249) - gate "safe to demo" met              |
 | UI-0 to UI-8 - Aurora visual system | 9 phases         |        9 | ~7.5 weeks      | ✅ Complete (#236-#248)                                         |
 | 1 - Production foundations          | 8 (P1-1 to P1-8) |        8 | ~4 weeks        | ✅ Complete (#250, #256-#263) - gate "safe to deploy" met in CI |
-| 2 - Correctness and tenancy         | 8 workstreams    |      0.4 | ~6 weeks        | 🟡 In progress - tenancy (P2-1) is 2 of 5 steps                 |
+| 2 - Correctness and tenancy         | 8 workstreams    |      0.6 | ~6 weeks        | 🟡 In progress - tenancy (P2-1) is 3 of 5 steps                 |
 | 3 - Architecture and sustainability | 5 workstreams    |        0 | ~12 weeks       | ⬜ Not started                                                  |
-| **Total**                           | **42**           | **29.4** | **~30.5 weeks** | **~42% of effort, 70% of items**                                |
+| **Total**                           | **42**           | **29.6** | **~30.5 weeks** | **~42% of effort, 70% of items**                                |
 
 The two figures differ because the remaining phases are the large ones: Phase 2
 and 3 are 13 of the 42 items but about 18 of the 30.5 estimated weeks. Use the
@@ -225,7 +225,9 @@ effort figure for planning.
 - **Phase 2 so far**: ADR-0001 tenancy model accepted (#264); P2-1a enforcement
   foundation - every route classified and core routes through
   `ResourceAccessService` (#269); P2-1b edit keys and claiming for anonymous data
-  (#270).
+  (#270); P2-1c anonymous data expiry - 30 days, a 60-day grace period for older
+  rows, expired rows read as 404 and are pruned by the retention sweep, with
+  per-table retention metrics (migration 045).
 - **Hygiene since then**: CodeQL triage, six findings fixed and the rest dismissed
   with reasons (#271); release images re-apply Alpine security fixes daily and zod
   4.6.7 (#281). Dependabot queue cleared on 2026-10-25: Actions bumps (#272, #274,
@@ -236,19 +238,18 @@ effort figure for planning.
 
 ### What next
 
-1. **P2-1c** - anonymous data retention: 30 days, then a 60-day grace.
-2. **P2-1d** - web tenancy UI: edit-key copy, claim into a team, viewer read-only.
-3. **P2-1e** - tenancy docs; closes H-04.
-4. **Rest of Phase 2**, in roadmap order: SCIM verified domains (H-01), cookie
+1. **P2-1d** - web tenancy UI: edit-key copy, claim into a team, viewer read-only, and the "expires in N days" badge (the API also needs to return `expiresAt`).
+2. **P2-1e** - tenancy docs; closes H-04.
+3. **Rest of Phase 2**, in roadmap order: SCIM verified domains (H-01), cookie
    sessions with CSRF (H-05 part 2), pricing truth with a nightly golden set
    (H-10, H-12), money as integer micro-dollars (M-04), Testcontainers
    integration tests (H-11), zod-to-OpenAPI contracts (M-08), safe VSDX parsing
    (M-03).
-5. **Phase 3**: enterprise-module scope ADR, backend modularisation, frontend
+4. **Phase 3**: enterprise-module scope ADR, backend modularisation, frontend
    re-architecture, one runtime target in IaC, governance.
 
 **Owner actions outstanding**: cut the first signed release (v0.2.0); run
-`npm run db:migrate` locally for migrations 043 and 044; free Colima disk space.
+`npm run db:migrate` locally for migrations 043 to 045; free Colima disk space.
 The legacy share-hash removal is scheduled after 2027-01-01.
 
 ## Phase 2.56 - VSDX visual evidence verification

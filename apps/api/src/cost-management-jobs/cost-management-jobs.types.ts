@@ -58,7 +58,7 @@ export interface DataRetentionSweepJobSummary {
   ranAt: string;
   totalEligibleRows: number;
   totalDeletedRows: number;
-  tables: Array<{ table: string; eligibleRows: number; deletedRows: number }>;
+  tables: Array<{ table: string; eligibleRows: number; deletedRows: number; stampedRows?: number }>;
 }
 
 export type CostManagementJobSummary =

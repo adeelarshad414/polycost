@@ -108,6 +108,7 @@ describe('ApiDatabaseRepository', () => {
       comparisonResult.pricingAsOf,
       null, // team_id: anonymous unless a team is passed (ADR-0001)
       null, // write_key_hash
+      expect.any(String), // expires_at: anonymous data expires (P2-1c)
     ]);
   });
 
@@ -3280,6 +3281,8 @@ describe('ApiDatabaseRepository', () => {
     expect(result.totalDeletedRows).toBe(0);
     expect(result.totalEligibleRows).toBe(7 * result.tables.length);
     expect(result.tables.map((row) => row.table)).toEqual([
+      'comparisons',
+      'workloads',
       'team_audit_event_exports',
       'comparison_audit_logs',
       'account_sessions',
@@ -3308,8 +3311,8 @@ describe('ApiDatabaseRepository', () => {
     const deletes = query.mock.calls
       .map(([text]) => String(text))
       .filter((text) => text.includes('DELETE FROM'));
-    expect(deletes).toHaveLength(6);
-    expect(result.totalDeletedRows).toBe(18);
+    expect(deletes).toHaveLength(8);
+    expect(result.totalDeletedRows).toBe(24);
 
     // Every delete is row-capped so a first sweep cannot hold a long lock.
     for (const statement of deletes) {
@@ -3332,6 +3335,162 @@ describe('ApiDatabaseRepository', () => {
   });
 });
 
+// ADR-0001 P2-1c: anonymous data expires.
+describe('ApiDatabaseRepository anonymous expiry', () => {
+  const NOW = new Date('2026-10-25T12:00:00.000Z');
+  const DAY_MS = 24 * 60 * 60 * 1000;
+  const TEAM = '44444444-4444-4444-8444-444444444444';
+
+  beforeEach(() => {
+    jest.useFakeTimers({ now: NOW, doNotFake: ['nextTick', 'setImmediate'] });
+  });
+  afterEach(() => {
+    jest.useRealTimers();
+  });
+
+  function repositoryWithDays(days: number | undefined, query: jest.Mock<QueryMock>) {
+    const pool: PgPoolLike = {
+      query: query as unknown as PgPoolLike['query'],
+      end: jest.fn<PgPoolLike['end']>(async () => undefined),
+    };
+    const config = {
+      get: jest.fn<ConfigService['get']>((key: keyof AppConfig) =>
+        key === 'ANONYMOUS_RETENTION_DAYS' ? days : (configService.get as jest.Mock)(key),
+      ),
+    } as unknown as ConfigService<AppConfig, true>;
+    return new ApiDatabaseRepository(config, secretsReader, () => pool);
+  }
+
+  const workloadRow = {
+    id: '55555555-5555-4555-8555-555555555555',
+    instance_family: 'general-purpose',
+    vcpu: 4,
+    memory_gb: '16',
+    region: 'us-east',
+    instance_count: 1,
+    hours_per_month: '730',
+    storage_gb: '0',
+    storage_tier: 'standard',
+    egress_gb_per_month: '0',
+    created_at: NOW,
+    updated_at: NOW,
+  };
+  const workloadInput = {
+    instanceFamily: 'general-purpose' as const,
+    vcpu: 4,
+    memoryGb: 16,
+    region: 'us-east',
+    instanceCount: 1,
+    hoursPerMonth: 730,
+    storageGb: 0,
+    storageTier: 'standard' as const,
+    egressGbPerMonth: 0,
+  };
+
+  it('stamps ANONYMOUS_RETENTION_DAYS on new anonymous data and nothing on team data', async () => {
+    const query = jest.fn<QueryMock>(async () => ({ rows: [workloadRow], rowCount: 1 }));
+    const repository = repositoryWithDays(7, query);
+
+    await repository.createWorkload(workloadInput as never);
+    await repository.createWorkload(workloadInput as never, TEAM);
+    await repository.saveComparison({} as never, comparisonResult as never);
+    await repository.saveComparison({} as never, comparisonResult as never, undefined, TEAM);
+
+    const expiries = query.mock.calls.map(([, params]) => (params as unknown[]).at(-1));
+    const inSevenDays = new Date(NOW.getTime() + 7 * DAY_MS).toISOString();
+    expect(expiries).toEqual([inSevenDays, null, inSevenDays, null]);
+    expect(String(query.mock.calls[0]?.[0])).toContain('expires_at');
+  });
+
+  it('defaults to 30 days when the setting is absent', async () => {
+    const query = jest.fn<QueryMock>(async () => ({ rows: [workloadRow], rowCount: 1 }));
+    await repositoryWithDays(undefined, query).createWorkload(workloadInput as never);
+    expect((query.mock.calls[0]?.[1] as unknown[]).at(-1)).toBe(
+      new Date(NOW.getTime() + 30 * DAY_MS).toISOString(),
+    );
+  });
+
+  it.each(['comparison', 'workload', 'alert', 'shareLink'] as const)(
+    'reads an expired anonymous %s as missing',
+    async (kind) => {
+      const query = jest.fn<QueryMock>(async () => ({ rows: [], rowCount: 0 }));
+      const id = kind === 'shareLink' ? 'token' : '55555555-5555-4555-8555-555555555555';
+      await expect(createRepository(query).getResourceOwner(kind, id)).resolves.toBeUndefined();
+      expect(String(query.mock.calls[0]?.[0])).toMatch(
+        /\(\w+\.expires_at IS NULL OR \w+\.expires_at > now\(\)\)/,
+      );
+    },
+  );
+
+  it('clears the expiry when claiming, and cannot claim an expired row', async () => {
+    const query = jest.fn<QueryMock>(async () => ({ rows: [], rowCount: 1 }));
+    await expect(
+      createRepository(query).claimResource('workload', workloadRow.id, TEAM),
+    ).resolves.toBe(true);
+    const sql = String(query.mock.calls[0]?.[0]);
+    expect(sql).toContain('expires_at = NULL');
+    expect(sql).toContain('expires_at > now()');
+  });
+
+  it('stops serving share links once their anonymous workload expires', async () => {
+    const query = jest.fn<QueryMock>(async () => ({ rows: [], rowCount: 0 }));
+    await createRepository(query).getActiveShareLink('hash');
+    expect(String(query.mock.calls[0]?.[0])).toMatch(
+      /workloads\.expires_at IS NULL OR workloads\.expires_at > now\(\)/,
+    );
+  });
+
+  it('gives unstamped anonymous rows the grace period, even in report-only mode', async () => {
+    const query = jest.fn<QueryMock>(async (text: string) => {
+      if (text.startsWith('SELECT COUNT(*)')) {
+        return { rows: [{ eligible: '0' }], rowCount: 1 };
+      }
+      return { rows: [], rowCount: text.includes('UPDATE comparisons') ? 4 : 2 };
+    });
+
+    const result = await createRepository(query).pruneExpiredData({
+      now: NOW.toISOString(),
+      mode: 'report-only',
+      windows: retentionWindows(),
+      maxRowsPerTable: 500,
+    });
+
+    const stamps = query.mock.calls.filter(([text]) => String(text).includes('SET expires_at'));
+    expect(stamps).toHaveLength(2);
+    for (const [text, params] of stamps) {
+      expect(String(text)).toContain('team_id IS NULL AND expires_at IS NULL LIMIT 500');
+      expect(params).toEqual([new Date(NOW.getTime() + 60 * DAY_MS).toISOString()]);
+    }
+    expect(result.tables.find((row) => row.table === 'comparisons')?.stampedRows).toBe(4);
+    expect(result.tables.find((row) => row.table === 'workloads')?.stampedRows).toBe(2);
+    expect(result.totalDeletedRows).toBe(0);
+  });
+
+  it('deletes only anonymous rows past their expiry', async () => {
+    const query = jest.fn<QueryMock>(async (text: string) => {
+      if (text.startsWith('SELECT COUNT(*)')) {
+        return { rows: [{ eligible: '1' }], rowCount: 1 };
+      }
+      return { rows: [], rowCount: 1 };
+    });
+
+    await createRepository(query).pruneExpiredData({
+      now: NOW.toISOString(),
+      mode: 'delete-expired',
+      windows: retentionWindows(),
+      maxRowsPerTable: 500,
+    });
+
+    for (const table of ['comparisons', 'workloads']) {
+      const call = query.mock.calls.find(([text]) =>
+        String(text).includes(`DELETE FROM ${table}\n`),
+      );
+      expect(String(call?.[0])).toContain('team_id IS NULL AND expires_at <= $1');
+      expect(call?.[1]).toEqual([NOW.toISOString()]);
+    }
+  });
+});
+
 function retentionWindows() {
   return {
     teamAuditEventDays: 2555,
@@ -3340,6 +3499,7 @@ function retentionWindows() {
     accountSessionDays: 30,
     exchangeRateDays: 730,
     pricingEtlRunDays: 180,
+    anonymousGraceDays: 60,
   };
 }
 

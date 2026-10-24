@@ -311,9 +311,14 @@ Every comparison, workload and diagram import is either **team-owned** or
   refresh) needs its **edit key**, returned once at creation in `writeKey` and sent as
   `X-PolyCost-Write-Key`. The web app keeps the key in the browser that created the
   resource. Anonymous data created before edit keys existed is read-only.
+- **Expiry:** anonymous data expires `ANONYMOUS_RETENTION_DAYS` (default 30) after it
+  is created and then reads as `404`, along with its share links. Data that existed
+  before expiry shipped gets a 60-day grace period (`ANONYMOUS_RETENTION_GRACE_DAYS`).
+  The nightly retention sweep deletes expired rows once
+  `DATA_RETENTION_ENFORCEMENT_MODE=delete-expired`. Team-owned data never expires.
 - **Claiming:** a signed-in member holding the edit key can move anonymous data into
   their team with `POST /comparisons/:id/claim` or `POST /workloads/:id/claim`; from then
-  on it is team-only.
+  on it is team-only and no longer expires.
 - `ANONYMOUS_MODE=disabled` requires a session on every core route, for hosted
   multi-tenant deployments. Every route declares its access class, and a contract test
   fails CI if one does not. Callers can only reach a resource whose id they already have (list endpoints

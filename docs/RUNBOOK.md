@@ -30,6 +30,7 @@ All emitted metrics are on `GET /metrics` in Prometheus text format.
 | Request rate, error rate, latency by route    | `http_requests_total`, `http_request_errors_total`, `http_request_duration_seconds`                                                 | ✅     |
 | Pricing ETL rows and freshness by provider    | `pricing_etl_runs_total`, `pricing_etl_records_total`, `pricing_etl_duration_seconds`, `pricing_etl_last_success_timestamp_seconds` | ✅     |
 | Pricing ETL prune decisions                   | `pricing_etl_prunes_total{outcome}`, `pricing_etl_pruned_rows_total`                                                                | ✅     |
+| Retention sweep, incl. expired anonymous data | `data_retention_eligible_rows{table}`, `data_retention_deleted_rows_total{table}`, `data_retention_stamped_rows_total{table}`       | ✅     |
 | Modeled-rate fallbacks (catalog miss/outage)  | `pricing_rate_fallbacks_total{provider,reason}`                                                                                     | ✅     |
 | Report export duration and failures           | `report_exports_total`, `report_export_duration_seconds`                                                                            | ✅     |
 | Auth failure and lockout rate                 | `auth_attempts_total`, `auth_lockouts_total`                                                                                        | ✅     |

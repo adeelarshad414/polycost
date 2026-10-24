@@ -182,6 +182,8 @@ Production deployment, migration strategy, and rollback are covered in
 > irreversible opt-in:
 > `DATA_RETENTION_ENFORCEMENT_MODE` (deletes expired rows) and
 > `INVOICE_ARTIFACT_RETENTION_ENFORCEMENT_MODE` (deletes invoice artifacts).
+> Expiry itself is not opt-in: anonymous data reads as `404` once it is past
+> `ANONYMOUS_RETENTION_DAYS` (default 30), whether or not it has been deleted yet.
 
 ---
 

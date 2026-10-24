@@ -42,6 +42,16 @@ once tagged releases begin.
 
 ### Added
 
+- Anonymous data expires, ADR-0001 step 3 (P2-1c). Anonymous comparisons and
+  workloads expire `ANONYMOUS_RETENTION_DAYS` (default 30) after creation and then
+  read as `404`, along with their share links and budget alerts. Rows from before
+  this release get a 60-day grace period (`ANONYMOUS_RETENTION_GRACE_DAYS`), counted
+  from the first retention sweep. The sweep deletes expired rows, cascading to
+  budgets, alerts and share links, once `DATA_RETENTION_ENFORCEMENT_MODE=delete-expired`.
+  Claiming into a team removes the expiry. The new metrics
+  `data_retention_eligible_rows`, `data_retention_deleted_rows_total` and
+  `data_retention_stamped_rows_total` cover every retained table (migration 045,
+  Helm `config.anonymousRetentionDays` / `anonymousRetentionGraceDays`).
 - Iris, the PolyCost mascot (line art v1): five poses, a token-only `<Iris />` component,
   and placements in the landing hero, first-run, comparison loading, verdict card and
   pricing warnings. Brand rules are tested (equal beams, provider colours on the beams

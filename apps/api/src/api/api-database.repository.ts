@@ -619,6 +619,8 @@ export interface DataRetentionWindows {
   accountSessionDays: number;
   exchangeRateDays: number;
   pricingEtlRunDays: number;
+  /** Granted to anonymous rows that predate expiry (P2-1c), from the first sweep. */
+  anonymousGraceDays: number;
 }
 
 export interface DataRetentionTableResult {
@@ -627,6 +629,12 @@ export interface DataRetentionTableResult {
   eligibleRows: number;
   /** Rows actually removed this run; always 0 in report-only mode. */
   deletedRows: number;
+  /**
+   * Anonymous rows without an expiry that this run gave the grace period
+   * (comparisons and workloads only). Stamping happens in both modes: it
+   * deletes nothing, and without it the grace period would never start.
+   */
+  stampedRows?: number;
 }
 
 export interface DataRetentionSweepResult {
@@ -729,9 +737,10 @@ export class ApiDatabaseRepository implements OnModuleDestroy {
           result_snapshot,
           pricing_as_of,
           team_id,
-          write_key_hash
+          write_key_hash,
+          expires_at
         )
-        VALUES ($1, $2::jsonb, $3::jsonb, $4, $5, $6)
+        VALUES ($1, $2::jsonb, $3::jsonb, $4, $5, $6, $7)
       `,
       [
         resultSnapshot.comparisonId,
@@ -740,6 +749,7 @@ export class ApiDatabaseRepository implements OnModuleDestroy {
         resultSnapshot.pricingAsOf,
         ownerTeamId,
         writeKeyHash,
+        this.anonymousExpiry(ownerTeamId),
       ],
     );
   }
@@ -1407,9 +1417,10 @@ export class ApiDatabaseRepository implements OnModuleDestroy {
           storage_tier,
           egress_gb_per_month,
           team_id,
-          write_key_hash
+          write_key_hash,
+          expires_at
         )
-        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
+        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
         RETURNING id,
                   instance_family,
                   vcpu,
@@ -1435,6 +1446,7 @@ export class ApiDatabaseRepository implements OnModuleDestroy {
         input.egressGbPerMonth,
         ownerTeamId,
         writeKeyHash,
+        this.anonymousExpiry(ownerTeamId),
       ],
     );
 
@@ -1620,6 +1632,9 @@ export class ApiDatabaseRepository implements OnModuleDestroy {
         FROM budgets
         JOIN workloads
           ON workloads.id = budgets.workload_id
+        -- Expired anonymous workloads (P2-1c) are gone for readers; do not
+        -- keep raising alerts nobody can open while they wait to be pruned.
+        WHERE workloads.expires_at IS NULL OR workloads.expires_at > now()
         ORDER BY budgets.updated_at DESC
       `,
     );
@@ -1899,6 +1914,13 @@ export class ApiDatabaseRepository implements OnModuleDestroy {
         WHERE token = $1
           AND revoked_at IS NULL
           AND expires_at > now()
+          -- P2-1c: a link dies with its workload's anonymous expiry.
+          AND EXISTS (
+            SELECT 1
+            FROM workloads
+            WHERE workloads.id = share_links.workload_id
+              AND (workloads.expires_at IS NULL OR workloads.expires_at > now())
+          )
       `,
       [token],
     );
@@ -2688,22 +2710,36 @@ export class ApiDatabaseRepository implements OnModuleDestroy {
   }
 
   /**
+   * ADR-0001 P2-1c: when a new resource expires - ANONYMOUS_RETENTION_DAYS
+   * from now for anonymous data, never (null) for team-owned data.
+   */
+  private anonymousExpiry(ownerTeamId: string | null): string | null {
+    if (ownerTeamId !== null) {
+      return null;
+    }
+    const configured = this.configService.get('ANONYMOUS_RETENTION_DAYS', { infer: true });
+    const days = typeof configured === 'number' && configured > 0 ? configured : 30;
+    return new Date(Date.now() + days * 24 * 60 * 60 * 1000).toISOString();
+  }
+
+  /**
    * ADR-0001: the owning team of a core resource. `undefined` means the
-   * resource does not exist; `{ teamId: null }` means it is anonymous. Child
-   * resources (alerts, share links) inherit their workload's owner.
+   * resource does not exist - or is anonymous and past its expiry (P2-1c),
+   * which reads the same until the retention sweep deletes it.
+   * `{ teamId: null }` means it is anonymous. Child resources (alerts, share
+   * links) inherit their workload's owner and expiry.
    */
   async getResourceOwner(kind: ResourceKind, id: string): Promise<ResourceOwner | undefined> {
     if (kind !== 'shareLink' && !UUID_PATTERN.test(id)) {
       return undefined;
     }
     // Children (alerts, share links) carry their workload's owner and edit key.
+    const live = (table: string) => `(${table}.expires_at IS NULL OR ${table}.expires_at > now())`;
     const sql: Record<ResourceKind, string> = {
-      comparison: 'SELECT team_id, write_key_hash FROM comparisons WHERE id = $1',
-      workload: 'SELECT team_id, write_key_hash FROM workloads WHERE id = $1',
-      alert:
-        'SELECT workloads.team_id, workloads.write_key_hash FROM alerts JOIN workloads ON workloads.id = alerts.workload_id WHERE alerts.id = $1',
-      shareLink:
-        'SELECT workloads.team_id, workloads.write_key_hash FROM share_links JOIN workloads ON workloads.id = share_links.workload_id WHERE share_links.token = $1',
+      comparison: `SELECT team_id, write_key_hash FROM comparisons WHERE id = $1 AND ${live('comparisons')}`,
+      workload: `SELECT team_id, write_key_hash FROM workloads WHERE id = $1 AND ${live('workloads')}`,
+      alert: `SELECT workloads.team_id, workloads.write_key_hash FROM alerts JOIN workloads ON workloads.id = alerts.workload_id WHERE alerts.id = $1 AND ${live('workloads')}`,
+      shareLink: `SELECT workloads.team_id, workloads.write_key_hash FROM share_links JOIN workloads ON workloads.id = share_links.workload_id WHERE share_links.token = $1 AND ${live('workloads')}`,
     };
     const result = await (
       await this.getPool()
@@ -2716,9 +2752,10 @@ export class ApiDatabaseRepository implements OnModuleDestroy {
 
   /**
    * ADR-0001 §3.5: move an anonymous comparison or workload into a team. The
-   * edit key is cleared - team roles govern changes from now on. Only an
-   * anonymous row can be claimed (`team_id IS NULL`), so a race cannot steal
-   * an already-claimed resource.
+   * edit key and the expiry are cleared - team roles govern changes from now
+   * on, and team data is kept until deleted. Only a live anonymous row can be
+   * claimed (`team_id IS NULL`, not expired), so a race cannot steal an
+   * already-claimed resource or revive an expired one.
    */
   async claimResource(
     kind: 'comparison' | 'workload',
@@ -2729,7 +2766,9 @@ export class ApiDatabaseRepository implements OnModuleDestroy {
     const result = await (
       await this.getPool()
     ).query(
-      `UPDATE ${table} SET team_id = $2, write_key_hash = NULL WHERE id = $1 AND team_id IS NULL`,
+      `UPDATE ${table}
+       SET team_id = $2, write_key_hash = NULL, expires_at = NULL
+       WHERE id = $1 AND team_id IS NULL AND (expires_at IS NULL OR expires_at > now())`,
       [id, teamId],
     );
     return (result.rowCount ?? 0) === 1;
@@ -5289,9 +5328,41 @@ export class ApiDatabaseRepository implements OnModuleDestroy {
     const cutoff = (days: number) =>
       new Date(Date.parse(input.now) - days * 24 * 60 * 60 * 1000).toISOString();
 
+    // P2-1c: anonymous rows created before expiry existed (or by a pod still on
+    // the old code during a rollout, or left anonymous when their team was
+    // deleted) carry no expiry. Give them the grace period, bounded like the
+    // deletes. New anonymous rows are stamped at creation instead.
+    const graceEndsAt = new Date(
+      Date.parse(input.now) + input.windows.anonymousGraceDays * 24 * 60 * 60 * 1000,
+    ).toISOString();
+    const stamped = new Map<string, number>();
+    for (const table of ['comparisons', 'workloads']) {
+      const result = await pool.query(
+        `UPDATE ${table}
+         SET expires_at = $1
+         WHERE id IN (
+           SELECT id FROM ${table} WHERE team_id IS NULL AND expires_at IS NULL LIMIT ${limit}
+         )`,
+        [graceEndsAt],
+      );
+      stamped.set(table, result.rowCount ?? 0);
+    }
+
     // Ordered deliberately: delivered outbox rows first, then the audit events
     // they referenced, so the NOT EXISTS guard sees the freshest outbox state.
+    // Expired anonymous comparisons and workloads (ADR-0001 P2-1c) take their
+    // budgets, alerts, share links and audit rows with them (ON DELETE CASCADE).
     const plans: Array<{ table: string; where: string; params: unknown[] }> = [
+      {
+        table: 'comparisons',
+        where: `team_id IS NULL AND expires_at <= $1`,
+        params: [input.now],
+      },
+      {
+        table: 'workloads',
+        where: `team_id IS NULL AND expires_at <= $1`,
+        params: [input.now],
+      },
       {
         table: 'team_audit_event_exports',
         where: `status = 'delivered' AND delivered_at < $1`,
@@ -5339,8 +5410,10 @@ export class ApiDatabaseRepository implements OnModuleDestroy {
       );
       const eligibleRows = Number.parseInt(eligible.rows[0]?.eligible ?? '0', 10);
 
+      const stampedRows = stamped.has(plan.table) ? { stampedRows: stamped.get(plan.table) } : {};
+
       if (input.mode !== 'delete-expired' || eligibleRows === 0) {
-        tables.push({ table: plan.table, eligibleRows, deletedRows: 0 });
+        tables.push({ table: plan.table, eligibleRows, deletedRows: 0, ...stampedRows });
         continue;
       }
 
@@ -5355,6 +5428,7 @@ export class ApiDatabaseRepository implements OnModuleDestroy {
         table: plan.table,
         eligibleRows,
         deletedRows: deleted.rowCount ?? 0,
+        ...stampedRows,
       });
     }
 

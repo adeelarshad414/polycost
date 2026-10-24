@@ -240,6 +240,14 @@ export const configSchema = z
     // account). `disabled` requires a session on every core route; a hosted
     // multi-tenant deployment sets it explicitly (the Helm chart always does).
     ANONYMOUS_MODE: z.enum(['enabled', 'disabled']).default('enabled'),
+    // ADR-0001 §6 decision 2: anonymous data expires this many days after it
+    // is created (stamped on the row, so changing it affects new rows only).
+    // Expired rows read as 404 at once; the retention sweep deletes them when
+    // DATA_RETENTION_ENFORCEMENT_MODE=delete-expired.
+    ANONYMOUS_RETENTION_DAYS: z.coerce.number().int().min(1).max(3650).default(30),
+    // Anonymous rows from before expiry existed get this long, counted from the
+    // first sweep that sees them, before they expire.
+    ANONYMOUS_RETENTION_GRACE_DAYS: z.coerce.number().int().min(1).max(3650).default(60),
     FEATURE_RESERVED_PRICING: envBoolean(true),
   })
   .superRefine((config, context) => {
