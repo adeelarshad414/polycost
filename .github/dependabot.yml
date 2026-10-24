@@ -13,17 +13,23 @@ updates:
       - dependency-name: typescript
         versions: ['>=6.1.0']
     groups:
-      # Listed first because the first matching group wins. The visual job runs in
-      # a digest-pinned mcr.microsoft.com/playwright image (ci.yml) whose browser
-      # build must match @playwright/test, and a new Chromium can move the
-      # screenshot baselines. So Playwright arrives on its own PR: bump the image,
-      # regenerate the baselines, and leave the rest of the npm group unblocked.
+      # The visual job runs in a digest-pinned mcr.microsoft.com/playwright image
+      # (ci.yml) whose browser build must match @playwright/test, and a new
+      # Chromium can move the screenshot baselines. So Playwright arrives on its
+      # own PR: bump the image with it (and the baselines if they move), leaving
+      # the rest of the npm group unblocked.
       playwright:
         patterns:
           - '@playwright/test'
           - playwright
           - playwright-core
       npm-minor-and-patch:
+        # Group order alone did not keep Playwright out of this group (#284),
+        # so exclude it explicitly.
+        exclude-patterns:
+          - '@playwright/test'
+          - playwright
+          - playwright-core
         update-types:
           - minor
           - patch

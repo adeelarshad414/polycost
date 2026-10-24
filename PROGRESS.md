@@ -228,15 +228,16 @@ effort figure for planning.
   (#270).
 - **Hygiene since then**: CodeQL triage, six findings fixed and the rest dismissed
   with reasons (#271); release images re-apply Alpine security fixes daily and zod
-  4.6.7 (#281); Dependabot queue drained: #272 and #275 merged; TypeScript 7 and
-  Node 26 held, and Playwright and CodeQL actions grouped (#279).
+  4.6.7 (#281); Dependabot: Actions bumps (#272, #275) and ioredis 6 (#233)
+  merged; TypeScript 7 and Node 26 held, Playwright and CodeQL actions grouped
+  (#279, #286).
 
 ### What next
 
-1. **Finish the Dependabot queue**: the combined CodeQL init/analyze bump, the
-   npm minor/patch group once Playwright is split out of it, then Playwright on
-   its own (CI image and baselines together). ioredis 6 (#233) needs its api image
-   failure looked at.
+1. **Close out the Dependabot queue** (on auto-merge, waiting for green CI): CodeQL
+   init/analyze together (#285), the npm minor/patch group with Playwright 1.64.1
+   and its CI image (#284), and setup-node 7.1.0 (#274) once Dependabot recreates
+   it.
 2. **P2-1c** - anonymous data retention: 30 days, then a 60-day grace.
 3. **P2-1d** - web tenancy UI: edit-key copy, claim into a team, viewer read-only.
 4. **P2-1e** - tenancy docs; closes H-04.
