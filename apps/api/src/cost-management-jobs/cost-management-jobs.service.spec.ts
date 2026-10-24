@@ -227,6 +227,39 @@ describe('CostManagementJobsService', () => {
     });
     expect(auditExportService.flushPendingExports).toHaveBeenCalledTimes(1);
   });
+
+  it('publishes retention sweep results, including expired anonymous data (P2-1c)', async () => {
+    const tables = [
+      { table: 'comparisons', eligibleRows: 3, deletedRows: 3, stampedRows: 1 },
+      { table: 'account_sessions', eligibleRows: 5, deletedRows: 5 },
+    ];
+    const repository = repositoryMock({
+      pruneExpiredData: jest.fn(async () => ({
+        mode: 'delete-expired' as const,
+        ranAt: '2026-10-25T00:00:00.000Z',
+        maxRowsPerTable: 500,
+        tables,
+        totalEligibleRows: 8,
+        totalDeletedRows: 8,
+      })),
+    });
+    const domainMetrics = { recordDataRetentionSweep: jest.fn() };
+    const service = new CostManagementJobsService(
+      repository as unknown as ApiDatabaseRepository,
+      exchangeRateClientMock(),
+      undefined,
+      domainMetrics as never,
+    );
+
+    await expect(
+      service.runDataRetentionSweep({
+        mode: 'delete-expired',
+        maxRowsPerTable: 500,
+        windows: {} as never,
+      }),
+    ).resolves.toMatchObject({ totalDeletedRows: 8, tables });
+    expect(domainMetrics.recordDataRetentionSweep).toHaveBeenCalledWith(tables);
+  });
 });
 
 function repositoryMock(overrides: Record<string, unknown> = {}) {

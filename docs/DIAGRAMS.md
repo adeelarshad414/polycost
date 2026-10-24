@@ -466,6 +466,28 @@ stateDiagram-v2
 > ℹ️ Mermaid state IDs cannot contain hyphens. The stored values are
 > `matched`, `variance-warning`, `variance-critical`, `unmatched`.
 
+### ⏳ Anonymous comparison or workload (ADR-0001)
+
+```mermaid
+stateDiagram-v2
+    [*] --> live: created without a session (expires in ANONYMOUS_RETENTION_DAYS)
+    [*] --> unstamped: created before expiry existed
+    unstamped --> live: first retention sweep (grace period)
+    live --> team_owned: claimed with session and edit key
+    live --> expired: expires_at passes
+    expired --> [*]: sweep deletes (delete-expired mode)
+    team_owned --> [*]: deleted by the team
+    note right of expired
+        Reads 404 at once, with
+        its share links and alerts;
+        rows go once deletion
+        is enabled
+    end note
+```
+
+> ℹ️ `team_owned` is `team_id` set with `expires_at` NULL. Budgets, alerts and share
+> links cascade with their workload, so pruning one leaves nothing orphaned.
+
 ### 📮 Audit export outbox
 
 ```mermaid

@@ -165,6 +165,9 @@ export class CostManagementJobsScheduler implements OnModuleInit, OnModuleDestro
         pricingEtlRunDays: this.configService.get('DATA_RETENTION_PRICING_ETL_RUN_DAYS', {
           infer: true,
         }),
+        anonymousGraceDays: this.configService.get('ANONYMOUS_RETENTION_GRACE_DAYS', {
+          infer: true,
+        }),
       },
     };
   }

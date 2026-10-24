@@ -1,6 +1,7 @@
 import { Module } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { Queue, Worker } from 'bullmq';
+import { DomainMetricsService } from '../observability/domain-metrics.service.js';
 import { ErrorReporter } from '../observability/error-reporter.js';
 import { reportWorkerFailures } from '../observability/process-errors.js';
 import { ApiDatabaseRepository } from '../api/api-database.repository.js';
@@ -35,12 +36,24 @@ import { bullmqConnection } from '../config/redis-connection.js';
     },
     {
       provide: CostManagementJobsService,
-      inject: [ApiDatabaseRepository, EXCHANGE_RATE_CLIENT, TeamAuditExportService],
+      inject: [
+        ApiDatabaseRepository,
+        EXCHANGE_RATE_CLIENT,
+        TeamAuditExportService,
+        DomainMetricsService,
+      ],
       useFactory: (
         repository: ApiDatabaseRepository,
         exchangeRateClient: ExchangeRateClient,
         auditExportService: TeamAuditExportService,
-      ) => new CostManagementJobsService(repository, exchangeRateClient, auditExportService),
+        domainMetrics: DomainMetricsService,
+      ) =>
+        new CostManagementJobsService(
+          repository,
+          exchangeRateClient,
+          auditExportService,
+          domainMetrics,
+        ),
     },
     {
       provide: COST_MANAGEMENT_QUEUE,

@@ -51,6 +51,9 @@ export class DomainMetricsService {
   private readonly etlRecords: Counter<'provider' | 'outcome'>;
   private readonly etlPrunes: Counter<'provider' | 'outcome'>;
   private readonly etlPrunedRows: Counter<'provider'>;
+  private readonly retentionEligibleRows: Gauge<'table'>;
+  private readonly retentionDeletedRows: Counter<'table'>;
+  private readonly retentionStampedRows: Counter<'table'>;
   private readonly etlDuration: Histogram<'provider'>;
   private readonly etlLastSuccess: Gauge<'provider'>;
   private readonly vaultReads: Counter<'outcome'>;
@@ -129,6 +132,30 @@ export class DomainMetricsService {
       name: 'pricing_etl_pruned_rows_total',
       help: 'Live pricing rows deleted because the provider no longer returned them.',
       labelNames: ['provider'],
+      registers,
+    });
+
+    // DB-2 retention sweep, including expired anonymous data (ADR-0001 P2-1c).
+    // Eligible is a gauge: it is what is past its window right now, so it can
+    // shrink. Report-only mode shows up as eligible rows with no deletions.
+    this.retentionEligibleRows = new Gauge({
+      name: 'data_retention_eligible_rows',
+      help: 'Rows past their retention window at the last sweep, by table.',
+      labelNames: ['table'],
+      registers,
+    });
+
+    this.retentionDeletedRows = new Counter({
+      name: 'data_retention_deleted_rows_total',
+      help: 'Rows deleted by the retention sweep, by table.',
+      labelNames: ['table'],
+      registers,
+    });
+
+    this.retentionStampedRows = new Counter({
+      name: 'data_retention_stamped_rows_total',
+      help: 'Anonymous rows given the grace-period expiry by the retention sweep, by table.',
+      labelNames: ['table'],
       registers,
     });
 
@@ -360,6 +387,25 @@ export class DomainMetricsService {
     this.etlPrunes.inc({ provider, outcome });
     if (prunedRows > 0) {
       this.etlPrunedRows.inc({ provider }, prunedRows);
+    }
+  }
+
+  recordDataRetentionSweep(
+    tables: ReadonlyArray<{
+      table: string;
+      eligibleRows: number;
+      deletedRows: number;
+      stampedRows?: number;
+    }>,
+  ): void {
+    for (const row of tables) {
+      this.retentionEligibleRows.set({ table: row.table }, row.eligibleRows);
+      if (row.deletedRows > 0) {
+        this.retentionDeletedRows.inc({ table: row.table }, row.deletedRows);
+      }
+      if (row.stampedRows) {
+        this.retentionStampedRows.inc({ table: row.table }, row.stampedRows);
+      }
     }
   }
 
