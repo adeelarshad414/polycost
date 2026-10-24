@@ -9,7 +9,12 @@ FROM alpine:3.24
 
 # psql only; no server. sha256sum comes from busybox. `apk upgrade` picks up
 # security fixes released after the base image (audit H-13).
-RUN apk upgrade --no-cache \
+# SECURITY_PATCH_STAMP changes every day in CI (release.yml), so this layer is
+# rebuilt instead of replayed from the build cache; a cached `apk upgrade`
+# silently kept packages from the day it was first cached.
+ARG SECURITY_PATCH_STAMP=local
+RUN echo "security patches: ${SECURITY_PATCH_STAMP}" \
+  && apk upgrade --no-cache \
   && apk add --no-cache postgresql16-client age rclone \
   && adduser -D -H -u 10001 migrator
 
