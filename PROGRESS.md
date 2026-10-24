@@ -228,25 +228,23 @@ effort figure for planning.
   (#270).
 - **Hygiene since then**: CodeQL triage, six findings fixed and the rest dismissed
   with reasons (#271); release images re-apply Alpine security fixes daily and zod
-  4.6.7 (#281); Dependabot: Actions bumps (#272, #275) and ioredis 6 (#233)
-  merged; TypeScript 7 and Node 26 held, Playwright and CodeQL actions grouped
-  (#279, #286).
+  4.6.7 (#281). Dependabot queue cleared on 2026-10-25: Actions bumps (#272, #274,
+  #275), CodeQL init/analyze together (#285), ioredis 6 (#233), and the npm
+  minor/patch group with Playwright 1.64.1 and its CI image (#287). TypeScript 7,
+  Node 26 and OpenTelemetry 3 are held until their dependants support them, and
+  Playwright and CodeQL updates are grouped (#279, #286, #287; KNOWN-ISSUES K-11).
 
 ### What next
 
-1. **Close out the Dependabot queue** (on auto-merge, waiting for green CI): CodeQL
-   init/analyze together (#285), the npm minor/patch group with Playwright 1.64.1
-   and its CI image (#284), and setup-node 7.1.0 (#274) once Dependabot recreates
-   it.
-2. **P2-1c** - anonymous data retention: 30 days, then a 60-day grace.
-3. **P2-1d** - web tenancy UI: edit-key copy, claim into a team, viewer read-only.
-4. **P2-1e** - tenancy docs; closes H-04.
-5. **Rest of Phase 2**, in roadmap order: SCIM verified domains (H-01), cookie
+1. **P2-1c** - anonymous data retention: 30 days, then a 60-day grace.
+2. **P2-1d** - web tenancy UI: edit-key copy, claim into a team, viewer read-only.
+3. **P2-1e** - tenancy docs; closes H-04.
+4. **Rest of Phase 2**, in roadmap order: SCIM verified domains (H-01), cookie
    sessions with CSRF (H-05 part 2), pricing truth with a nightly golden set
    (H-10, H-12), money as integer micro-dollars (M-04), Testcontainers
    integration tests (H-11), zod-to-OpenAPI contracts (M-08), safe VSDX parsing
    (M-03).
-6. **Phase 3**: enterprise-module scope ADR, backend modularisation, frontend
+5. **Phase 3**: enterprise-module scope ADR, backend modularisation, frontend
    re-architecture, one runtime target in IaC, governance.
 
 **Owner actions outstanding**: cut the first signed release (v0.2.0); run
