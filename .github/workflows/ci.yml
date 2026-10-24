@@ -119,12 +119,12 @@ jobs:
   # UI-7: screenshot regression and Lighthouse budgets. Runs inside the same
   # Playwright image the baselines were generated in, so fonts and rasterisation
   # match pixel for pixel. To refresh baselines after an intended visual change:
-  #   docker run --rm -v "$PWD":/work -w /work mcr.microsoft.com/playwright:v1.63.0-noble \
+  #   docker run --rm -v "$PWD":/work -w /work mcr.microsoft.com/playwright:v1.64.1-noble \
   #     bash -lc 'npm ci && npm run build --workspace @polycost/web && cd apps/web && npm run test:visual:update'
   visual:
     runs-on: ubuntu-latest
     container:
-      image: mcr.microsoft.com/playwright:v1.63.0-noble@sha256:eff16c30e6f3f4af0a03fa4b706120d5e9b0891c344a27d64559aff5900a4a27
+      image: mcr.microsoft.com/playwright:v1.64.1-noble@sha256:47b510dd9230bf0b9bfc9b20102241e577ea7a99334ab4c3ca19f19770e9b8ea
       # Playwright's recommended setting: share the host IPC namespace so
       # Chromium is not limited to Docker's 64 MB /dev/shm.
       options: --ipc=host
