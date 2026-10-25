@@ -3491,6 +3491,72 @@ describe('ApiDatabaseRepository anonymous expiry', () => {
   });
 });
 
+// ADR-0001 §3.7: ownership badge and the team comparison list.
+describe('ApiDatabaseRepository ownership views', () => {
+  const ID = '55555555-5555-4555-8555-555555555555';
+
+  it('returns team name and expiry for a live row, nothing for an expired or malformed id', async () => {
+    const query = jest.fn<QueryMock>(async () => ({
+      rows: [{ team_id: null, team_name: null, expires_at: new Date('2026-11-24T00:00:00.000Z') }],
+      rowCount: 1,
+    }));
+    const repository = createRepository(query);
+
+    await expect(repository.getOwnershipDetails('workload', ID)).resolves.toEqual({
+      teamId: null,
+      teamName: null,
+      expiresAt: '2026-11-24T00:00:00.000Z',
+    });
+    expect(String(query.mock.calls[0]?.[0])).toContain('LEFT JOIN teams');
+    expect(String(query.mock.calls[0]?.[0])).toContain('workloads.expires_at > now()');
+    await expect(repository.getOwnershipDetails('comparison', 'nope')).resolves.toBeUndefined();
+    expect(query).toHaveBeenCalledTimes(1);
+  });
+
+  it('maps team comparison rows and clamps the limit', async () => {
+    const query = jest.fn<QueryMock>(async () => ({
+      rows: [
+        {
+          id: ID,
+          created_at: new Date('2026-10-25T00:00:00.000Z'),
+          pricing_as_of: new Date('2026-10-24T00:00:00.000Z'),
+          workload_name: 'Checkout',
+          workload_type: 'web_app',
+          cheapest_provider_id: 'gcp',
+          cheapest_monthly: '1234.5',
+          provider_count: 3,
+        },
+        {
+          id: ID,
+          created_at: new Date('2026-10-25T00:00:00.000Z'),
+          pricing_as_of: new Date('2026-10-24T00:00:00.000Z'),
+          workload_name: null,
+          workload_type: null,
+          cheapest_provider_id: null,
+          cheapest_monthly: null,
+          provider_count: null,
+        },
+      ],
+      rowCount: 2,
+    }));
+
+    const rows = await createRepository(query).listTeamComparisons('team', 500);
+
+    expect(rows[0]).toEqual({
+      comparisonId: ID,
+      createdAt: '2026-10-25T00:00:00.000Z',
+      pricingAsOf: '2026-10-24T00:00:00.000Z',
+      workloadName: 'Checkout',
+      workloadType: 'web_app',
+      cheapestProviderId: 'gcp',
+      cheapestMonthlyUsd: 1234.5,
+      providerCount: 3,
+    });
+    expect(rows[1]).toMatchObject({ cheapestMonthlyUsd: null, providerCount: 0 });
+    expect(query.mock.calls[0]?.[1]).toEqual(['team', 100]);
+  });
+});
+
 function retentionWindows() {
   return {
     teamAuditEventDays: 2555,

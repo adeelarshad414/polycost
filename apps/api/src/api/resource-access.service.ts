@@ -7,6 +7,7 @@ import {
   ApiDatabaseRepository,
   type ResourceKind,
   type ResourceOwner,
+  type TeamComparisonSummary,
 } from './api-database.repository.js';
 import { AuthService } from './auth.service.js';
 import type { AuthIdentity, RequestWithAuth } from './auth.types.js';
@@ -27,6 +28,25 @@ export type AccessMode = 'read' | 'write' | 'admin';
 export interface IssuedWriteKey {
   writeKey: string;
   writeKeyHash: string;
+}
+
+/**
+ * What the caller may do with a comparison or workload, for the web app's
+ * ownership badge and its edit/claim controls (ADR-0001 §3.7). Advisory only:
+ * every change route still enforces access itself.
+ */
+export interface ResourceOwnership {
+  owner: 'team' | 'anonymous';
+  teamId: string | null;
+  teamName: string | null;
+  /** When anonymous data expires (P2-1c); null for team-owned data. */
+  expiresAt: string | null;
+  /** The caller's role in the owning team; null for anonymous data. */
+  role: string | null;
+  /** Team role allows changes, or the edit key sent matches. */
+  canChange: boolean;
+  /** Anonymous, the edit key matches, and the caller can write in their active team. */
+  canClaim: boolean;
 }
 
 const WRITE_ROLES = new Set(['owner', 'admin', 'member']);
@@ -182,6 +202,66 @@ export class ResourceAccessService {
     return { teamId };
   }
 
+  /** Ownership as the caller sees it. Same 404 rules as reading the resource. */
+  async ownership(
+    kind: 'comparison' | 'workload',
+    id: string,
+    actor: Actor,
+  ): Promise<ResourceOwnership> {
+    const owner = await this.assert(kind, id, actor, 'read');
+    const details = await this.repository.getOwnershipDetails(kind, id);
+    if (!details) {
+      throw new ApiNotFoundError(NOT_FOUND[kind]);
+    }
+
+    if (owner.teamId !== null) {
+      // assert() has already proved membership, so a role is present.
+      const role = actor.identity
+        ? ((await this.repository.getTeamRole(actor.identity.accountId, owner.teamId)) ?? null)
+        : null;
+      return {
+        owner: 'team',
+        teamId: owner.teamId,
+        teamName: details.teamName,
+        expiresAt: null,
+        role,
+        canChange: role !== null && WRITE_ROLES.has(role),
+        canClaim: false,
+      };
+    }
+
+    const keyMatches = writeKeyMatches(actor.writeKey, owner.writeKeyHash);
+    const activeTeam = actor.identity?.teamId;
+    const activeRole =
+      keyMatches && actor.identity && activeTeam
+        ? await this.repository.getTeamRole(actor.identity.accountId, activeTeam)
+        : undefined;
+    return {
+      owner: 'anonymous',
+      teamId: null,
+      teamName: null,
+      expiresAt: details.expiresAt,
+      role: null,
+      canChange: keyMatches,
+      canClaim: activeRole !== undefined && WRITE_ROLES.has(activeRole),
+    };
+  }
+
+  /** ADR-0001 §3.7: the comparisons of the caller's active team, any role. */
+  async teamComparisons(actor: Actor, limit = 50): Promise<TeamComparisonSummary[]> {
+    const teamId = actor.identity?.teamId;
+    if (!actor.identity) {
+      throw new ApiUnauthorizedError('Sign in to see your team comparisons');
+    }
+    if (!teamId) {
+      throw new ApiForbiddenError('Create or join a team to see team comparisons');
+    }
+    if (!(await this.repository.getTeamRole(actor.identity.accountId, teamId))) {
+      throw new ApiForbiddenError('You are no longer a member of this team');
+    }
+    return this.repository.listTeamComparisons(teamId, limit);
+  }
+
   private anonymousEnabled(): boolean {
     return this.configService.get('ANONYMOUS_MODE', { infer: true }) !== 'disabled';
   }
@@ -221,4 +301,14 @@ export const OPEN_ACCESS = {
   writeKeyFor: (): IssuedWriteKey | null => null,
   assert: async (): Promise<ResourceOwner> => ({ teamId: null, writeKeyHash: null }),
   claim: async (): Promise<{ teamId: string }> => ({ teamId: '' }),
+  ownership: async (): Promise<ResourceOwnership> => ({
+    owner: 'anonymous',
+    teamId: null,
+    teamName: null,
+    expiresAt: null,
+    role: null,
+    canChange: true,
+    canClaim: false,
+  }),
+  teamComparisons: async (): Promise<TeamComparisonSummary[]> => [],
 } as unknown as ResourceAccessService;

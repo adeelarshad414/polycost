@@ -6,6 +6,7 @@ import {
   formatApiError,
   PolyCostApiError,
 } from './api-client';
+import { writeKeys } from './lib/write-keys';
 import { DiagramParseRequest, DiagramParseResult } from './types';
 import { buildNwsFromForm, defaultWorkloadForm } from './workload';
 
@@ -2464,6 +2465,83 @@ describe('api client', () => {
       'http://api.test/api/v1/exchange-rates?base=USD',
       expect.any(Object),
     );
+  });
+
+  // ADR-0001 §3.7: team-owned data is only reachable with the session.
+  describe('session on core calls', () => {
+    afterEach(() => {
+      window.localStorage.clear();
+    });
+
+    function capture() {
+      const fetchMock = jest.fn(async () => jsonResponse({ comparisons: [] }));
+      global.fetch = fetchMock as unknown as typeof fetch;
+      const headersOf = (call: number) =>
+        ((fetchMock.mock.calls[call] as unknown[])[1] as RequestInit).headers as Record<
+          string,
+          string
+        >;
+      return { fetchMock, headersOf };
+    }
+
+    it('sends the stored session on core calls', async () => {
+      window.localStorage.setItem('polycost-auth-session-v1', 'live-token');
+      window.localStorage.setItem('polycost-auth-session-expires-at-v1', '2099-01-01T00:00:00Z');
+      const { headersOf } = capture();
+
+      await createPolyCostClient('http://api.test/api/v1').listTeamComparisons(20);
+
+      expect(headersOf(0).Authorization).toBe('Bearer live-token');
+    });
+
+    it('sends nothing when signed out or the session has expired', async () => {
+      const { headersOf } = capture();
+      const client = createPolyCostClient('http://api.test/api/v1');
+
+      await client.getComparison('c1');
+      window.localStorage.setItem('polycost-auth-session-v1', 'dead-token');
+      window.localStorage.setItem('polycost-auth-session-expires-at-v1', '2000-01-01T00:00:00Z');
+      await client.getComparison('c1');
+
+      expect(headersOf(0).Authorization).toBeUndefined();
+      expect(headersOf(1).Authorization).toBeUndefined();
+    });
+
+    it('keeps an explicitly passed token', async () => {
+      window.localStorage.setItem('polycost-auth-session-v1', 'stored-token');
+      const { headersOf } = capture();
+
+      await createPolyCostClient('http://api.test/api/v1').getSsoStatus('explicit-token');
+
+      expect(headersOf(0).Authorization).toBe('Bearer explicit-token');
+    });
+
+    it('reads ownership, lists the team and claims with the edit key', async () => {
+      const { fetchMock, headersOf } = capture();
+      const client = createPolyCostClient('http://api.test/api/v1');
+      writeKeys.rememberComparison('c1', 'key-c');
+      writeKeys.rememberWorkload('w1', 'key-w');
+
+      await client.getComparisonOwnership('c1');
+      await client.getWorkloadOwnership('w1');
+      await expect(client.listTeamComparisons()).resolves.toEqual([]);
+      await client.claimComparison('c1');
+      await client.claimWorkload('w1');
+
+      const urls = fetchMock.mock.calls.map((call) => (call as unknown[])[0]);
+      expect(urls).toEqual([
+        'http://api.test/api/v1/comparisons/c1/ownership',
+        'http://api.test/api/v1/workloads/w1/ownership',
+        'http://api.test/api/v1/comparisons?limit=50',
+        'http://api.test/api/v1/comparisons/c1/claim',
+        'http://api.test/api/v1/workloads/w1/claim',
+      ]);
+      expect(headersOf(0)['X-PolyCost-Write-Key']).toBe('key-c');
+      expect(headersOf(1)['X-PolyCost-Write-Key']).toBe('key-w');
+      expect(headersOf(3)['X-PolyCost-Write-Key']).toBe('key-c');
+      expect(((fetchMock.mock.calls[3] as unknown[])[1] as RequestInit).method).toBe('POST');
+      writeKeys.clear();
+    });
   });
 
   it('maps failed binary export downloads through safe API errors', async () => {

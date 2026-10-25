@@ -83,6 +83,45 @@ export class ComparisonsController {
     return key ? { ...result, writeKey: key.writeKey } : result;
   }
 
+  /** ADR-0001 §3.7: the active team's comparisons, newest first (session required). */
+  @Get()
+  async listTeam(
+    @Query('limit') limit: unknown,
+    @Req() request?: RequestLike,
+    @Res({ passthrough: true }) response?: HeaderResponse,
+  ) {
+    await this.consumeRateLimit(
+      'comparison_list',
+      request,
+      response,
+      'RATE_LIMIT_PUBLIC_READ_PER_MINUTE',
+    );
+    const parsed = typeof limit === 'string' && limit !== '' ? Number(limit) : 50;
+    if (!Number.isInteger(parsed) || parsed < 1 || parsed > 100) {
+      throw new ApiValidationError('limit must be an integer from 1 to 100', [
+        { field: 'limit', issue: 'must be an integer from 1 to 100' },
+      ]);
+    }
+    const comparisons = await this.access.teamComparisons(await this.access.actor(request), parsed);
+    return { comparisons };
+  }
+
+  /** ADR-0001 §3.7: who owns this comparison and what the caller may do with it. */
+  @Get(':id/ownership')
+  async ownership(
+    @Param('id') comparisonId: string,
+    @Req() request?: RequestLike,
+    @Res({ passthrough: true }) response?: HeaderResponse,
+  ) {
+    await this.consumeRateLimit(
+      'comparison_get',
+      request,
+      response,
+      'RATE_LIMIT_PUBLIC_READ_PER_MINUTE',
+    );
+    return this.access.ownership('comparison', comparisonId, await this.access.actor(request));
+  }
+
   @Get(':id')
   async get(
     @Param('id') comparisonId: string,

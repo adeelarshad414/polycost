@@ -1,6 +1,9 @@
+import { currentSessionToken } from './lib/session-token';
 import { writeKeyHeaders, writeKeys } from './lib/write-keys';
 import {
   ApiErrorDetail,
+  ResourceOwnership,
+  TeamComparisonSummary,
   AccountSessionRecord,
   AccountProfileResponse,
   AlertRecord,
@@ -208,6 +211,14 @@ export interface PolyCostClient {
     options?: TerraformGenerateOptions;
   }): Promise<TerraformGenerationResult>;
   getComparison(comparisonId: string): Promise<ComparisonResult>;
+  /** ADR-0001 §3.7: owner, expiry and what this browser may do. */
+  getComparisonOwnership(comparisonId: string): Promise<ResourceOwnership>;
+  getWorkloadOwnership(workloadId: string): Promise<ResourceOwnership>;
+  /** The active team's comparisons; needs a session. */
+  listTeamComparisons(limit?: number): Promise<TeamComparisonSummary[]>;
+  /** Move anonymous data this browser holds the edit key for into the active team. */
+  claimComparison(comparisonId: string): Promise<{ comparisonId: string; teamId: string }>;
+  claimWorkload(workloadId: string): Promise<{ workloadId: string; teamId: string }>;
   getComparisonAnalytics(comparisonId: string): Promise<ComparisonAnalyticsResponse>;
   getComparisonPricingEvidence(comparisonId: string): Promise<ComparisonPricingEvidenceResponse>;
   refreshLiveComparison(comparisonId: string): Promise<ComparisonResult>;
@@ -650,6 +661,41 @@ export function createPolyCostClient(baseUrl = configuredApiBaseUrl()): PolyCost
         `/comparisons/${encodeURIComponent(comparisonId)}`,
       );
     },
+    getComparisonOwnership(comparisonId) {
+      return requestJson<ResourceOwnership>(
+        baseUrl,
+        `/comparisons/${encodeURIComponent(comparisonId)}/ownership`,
+        { headers: writeKeyHeaders(writeKeys.comparisonKey(comparisonId)) },
+      );
+    },
+    getWorkloadOwnership(workloadId) {
+      return requestJson<ResourceOwnership>(
+        baseUrl,
+        `/workloads/${encodeURIComponent(workloadId)}/ownership`,
+        { headers: writeKeyHeaders(writeKeys.workloadKey(workloadId)) },
+      );
+    },
+    async listTeamComparisons(limit = 50) {
+      const response = await requestJson<{ comparisons: TeamComparisonSummary[] }>(
+        baseUrl,
+        `/comparisons?limit=${encodeURIComponent(String(limit))}`,
+      );
+      return response.comparisons;
+    },
+    claimComparison(comparisonId) {
+      return requestJson<{ comparisonId: string; teamId: string }>(
+        baseUrl,
+        `/comparisons/${encodeURIComponent(comparisonId)}/claim`,
+        { method: 'POST', headers: writeKeyHeaders(writeKeys.comparisonKey(comparisonId)) },
+      );
+    },
+    claimWorkload(workloadId) {
+      return requestJson<{ workloadId: string; teamId: string }>(
+        baseUrl,
+        `/workloads/${encodeURIComponent(workloadId)}/claim`,
+        { method: 'POST', headers: writeKeyHeaders(writeKeys.workloadKey(workloadId)) },
+      );
+    },
     getComparisonAnalytics(comparisonId) {
       return requestJson<ComparisonAnalyticsResponse>(
         baseUrl,
@@ -1002,11 +1048,11 @@ async function downloadExportJobRequest(
   comparisonId: string,
   jobId: string,
 ): Promise<Blob> {
-  const response = await fetch(
-    `${baseUrl}/comparisons/${encodeURIComponent(comparisonId)}/export-jobs/${encodeURIComponent(
-      jobId,
-    )}/download`,
-  );
+  const url = `${baseUrl}/comparisons/${encodeURIComponent(
+    comparisonId,
+  )}/export-jobs/${encodeURIComponent(jobId)}/download`;
+  const headers = withSession({});
+  const response = await (Object.keys(headers).length > 0 ? fetch(url, { headers }) : fetch(url));
 
   if (!response.ok) {
     throw await toApiError(response);
@@ -1070,7 +1116,7 @@ async function requestJson<T>(
   path = '',
   init: RequestInit = {},
 ): Promise<T> {
-  const headers = normalizeHeaders(init.headers);
+  const headers = withSession(normalizeHeaders(init.headers));
   const method = init.method?.toUpperCase() ?? 'GET';
 
   if (
@@ -1101,6 +1147,18 @@ async function requestJson<T>(
       'The server returned a response that could not be read. Please try again.',
     );
   }
+}
+
+/**
+ * Adds the signed-in session to a request that does not already name one, so
+ * team-owned data stays reachable (ADR-0001 §3.7). Calls that pass a token
+ * explicitly - the account and team endpoints - keep theirs.
+ */
+function withSession(headers: Record<string, string>): Record<string, string> {
+  const token = currentSessionToken();
+  return token && !hasHeader(headers, 'Authorization')
+    ? { ...headers, Authorization: `Bearer ${token}` }
+    : headers;
 }
 
 function normalizeHeaders(headers: HeadersInit | undefined): Record<string, string> {

@@ -685,6 +685,26 @@ export interface ResourceOwner {
   writeKeyHash: string | null;
 }
 
+/** What the web app shows about who owns a comparison or workload (ADR-0001 §3.7). */
+export interface ResourceOwnershipDetails {
+  teamId: string | null;
+  teamName: string | null;
+  /** Anonymous data only (P2-1c); null for team-owned rows. */
+  expiresAt: string | null;
+}
+
+/** One row of a team's comparison list, read from the stored snapshots. */
+export interface TeamComparisonSummary {
+  comparisonId: string;
+  createdAt: string;
+  pricingAsOf: string;
+  workloadName: string | null;
+  workloadType: string | null;
+  cheapestProviderId: string | null;
+  cheapestMonthlyUsd: number | null;
+  providerCount: number;
+}
+
 const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 @Injectable()
@@ -2772,6 +2792,99 @@ export class ApiDatabaseRepository implements OnModuleDestroy {
       [id, teamId],
     );
     return (result.rowCount ?? 0) === 1;
+  }
+
+  /**
+   * Team name and expiry for a live comparison or workload. Access is the
+   * caller's job (ResourceAccessService.assert runs first); an expired
+   * anonymous row reads as missing, as everywhere else.
+   */
+  async getOwnershipDetails(
+    kind: 'comparison' | 'workload',
+    id: string,
+  ): Promise<ResourceOwnershipDetails | undefined> {
+    if (!UUID_PATTERN.test(id)) {
+      return undefined;
+    }
+    const table = kind === 'comparison' ? 'comparisons' : 'workloads';
+    const result = await (
+      await this.getPool()
+    ).query<{ team_id: string | null; team_name: string | null; expires_at: Date | null }>(
+      `SELECT ${table}.team_id, teams.name AS team_name, ${table}.expires_at
+       FROM ${table}
+       LEFT JOIN teams ON teams.id = ${table}.team_id
+       WHERE ${table}.id = $1
+         AND (${table}.expires_at IS NULL OR ${table}.expires_at > now())`,
+      [id],
+    );
+    const row = result.rows[0];
+    return row
+      ? {
+          teamId: row.team_id ?? null,
+          teamName: row.team_name ?? null,
+          expiresAt: row.expires_at ? new Date(row.expires_at).toISOString() : null,
+        }
+      : undefined;
+  }
+
+  /**
+   * ADR-0001 §3.7: a team's comparisons, newest first. The summary fields are
+   * pulled out of the JSON snapshots in SQL so the list never loads whole
+   * results; idx_comparisons_team serves the filter and order.
+   */
+  async listTeamComparisons(teamId: string, limit: number): Promise<TeamComparisonSummary[]> {
+    const result = await (
+      await this.getPool()
+    ).query<{
+      id: string;
+      created_at: Date;
+      pricing_as_of: Date;
+      workload_name: string | null;
+      workload_type: string | null;
+      cheapest_provider_id: string | null;
+      cheapest_monthly: string | null;
+      provider_count: number | null;
+    }>(
+      `SELECT comparisons.id,
+              comparisons.created_at,
+              comparisons.pricing_as_of,
+              comparisons.nws_snapshot -> 'workload' ->> 'name' AS workload_name,
+              comparisons.nws_snapshot -> 'workload' ->> 'type' AS workload_type,
+              comparisons.result_snapshot ->> 'cheapestProviderId' AS cheapest_provider_id,
+              (
+                SELECT provider -> 'totals' ->> 'monthly'
+                FROM jsonb_array_elements(
+                  CASE jsonb_typeof(comparisons.result_snapshot -> 'providers')
+                    WHEN 'array' THEN comparisons.result_snapshot -> 'providers'
+                    ELSE '[]'::jsonb
+                  END
+                ) AS provider
+                WHERE provider ->> 'providerId' = comparisons.result_snapshot ->> 'cheapestProviderId'
+                LIMIT 1
+              ) AS cheapest_monthly,
+              CASE jsonb_typeof(comparisons.result_snapshot -> 'providers')
+                WHEN 'array' THEN jsonb_array_length(comparisons.result_snapshot -> 'providers')
+                ELSE 0
+              END AS provider_count
+       FROM comparisons
+       WHERE comparisons.team_id = $1
+       ORDER BY comparisons.created_at DESC
+       LIMIT $2`,
+      [teamId, Math.max(1, Math.min(100, Math.trunc(limit)))],
+    );
+    return result.rows.map((row) => {
+      const monthly = row.cheapest_monthly === null ? Number.NaN : Number(row.cheapest_monthly);
+      return {
+        comparisonId: row.id,
+        createdAt: new Date(row.created_at).toISOString(),
+        pricingAsOf: new Date(row.pricing_as_of).toISOString(),
+        workloadName: row.workload_name ?? null,
+        workloadType: row.workload_type ?? null,
+        cheapestProviderId: row.cheapest_provider_id ?? null,
+        cheapestMonthlyUsd: Number.isFinite(monthly) ? monthly : null,
+        providerCount: Number(row.provider_count ?? 0),
+      };
+    });
   }
 
   /** The caller's role in a team, or undefined when they are not a member. */

@@ -210,6 +210,12 @@ team's comparison". Read access alone can't claim.
    sweep that sees them, not by the migration, which keeps the migration catalog-only.
 4. **P2-1d Web.** Send the token on core calls, the Team comparisons list, ownership badges, clearing
    history and keys on logout, and a claim action.
+   _Delivered in two PRs._ Part 1 is the plumbing: the session on every core call (read from
+   storage at call time; a known-expired token is not sent), clearing history and keys on
+   sign-out and account deletion, and the read models the UI needs:
+   `GET /comparisons/:id/ownership`, `GET /workloads/:id/ownership` and the team list
+   `GET /comparisons`. Ownership answers are advisory; every change route still enforces
+   access itself. Part 2 is the UI on top of them.
 5. **P2-1e Docs.** Rewrite the README "Anonymous and Workspace Features" section and `11-SECURITY.md`
    authn/authz, correct REQUIREMENTS FR-6.5 / NFR-2.2, and update DIAGRAMS.
 

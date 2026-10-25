@@ -27,6 +27,7 @@ import { CompareIcon, ParseIcon, ShieldIcon, SignInIcon } from './icons';
 import { reconciliationEvidenceSummary, workspaceSessionStatus } from './../lib/comparison-models';
 import { formatCurrency, formatSignedCurrency } from './../lib/format';
 import { clearStoredAuthToken, storeAuthSession } from './../lib/optimization-signals';
+import { writeKeys } from './../lib/write-keys';
 import {
   activeTeamToMembership,
   base64ToBlob,
@@ -82,6 +83,7 @@ export function WorkspaceControlCenter({
   initialStoredAuth,
   onNotice,
   onError,
+  onSignedOut,
 }: {
   client: PolyCostClient;
   comparisonId?: string;
@@ -89,6 +91,8 @@ export function WorkspaceControlCenter({
   initialStoredAuth: { token: string; expired: boolean };
   onNotice: (message: string | null) => void;
   onError: (message: string | null) => void;
+  /** Signed out or account deleted: the app forgets local history. */
+  onSignedOut?: () => void;
 }) {
   const [authMode, setAuthMode] = useState<'login' | 'register'>('login');
   const [token, setToken] = useState(initialStoredAuth.token);
@@ -444,13 +448,21 @@ export function WorkspaceControlCenter({
       // Local token cleanup is still correct if the server session has already expired.
     } finally {
       clearStoredAuthToken();
+      forgetLocalData();
       setToken('');
       setSession(null);
       setAccountSessions([]);
       setSessionExpiredNotice(false);
       setAuthBusy(false);
-      onNotice('Signed out of the workspace.');
+      onNotice('Signed out of the workspace. Local comparison history and edit keys were cleared.');
     }
+  }
+
+  // ADR-0001 §3.7: edit keys and history belong to whoever used this browser;
+  // the next person to sign in must not inherit them.
+  function forgetLocalData() {
+    writeKeys.clear();
+    onSignedOut?.();
   }
 
   async function handleRevokeOtherSessions() {
@@ -654,6 +666,7 @@ export function WorkspaceControlCenter({
         token,
       );
       clearStoredAuthToken();
+      forgetLocalData();
       setToken('');
       setSession(null);
       setSessionExpiredNotice(false);
