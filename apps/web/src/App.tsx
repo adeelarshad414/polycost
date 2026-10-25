@@ -1371,6 +1371,13 @@ export function App({ client = polyCostClient }: AppProps) {
     setNotice(`Loaded ${entry.summary}. Compare again to refresh pricing.`);
   }
 
+  // ADR-0001 §3.7: on a shared machine, signing out must not leave the next
+  // person this browser's comparisons or the edit keys that change them.
+  function handleSignedOut() {
+    setComparisonHistory([]);
+    clearComparisonHistory();
+  }
+
   function handleClearComparisonHistory() {
     setComparisonHistory([]);
     clearComparisonHistory();
@@ -1519,6 +1526,7 @@ export function App({ client = polyCostClient }: AppProps) {
             initialStoredAuth={initialStoredAuth}
             onNotice={setNotice}
             onError={setError}
+            onSignedOut={handleSignedOut}
           />
         </Suspense>
       ) : null}

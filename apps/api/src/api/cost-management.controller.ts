@@ -164,6 +164,25 @@ export class WorkloadsController {
     return key ? { ...workload, writeKey: key.writeKey } : workload;
   }
 
+  /** ADR-0001 §3.7: who owns this workload and what the caller may do with it. */
+  @Get(':id/ownership')
+  async ownership(
+    @Param('id') workloadId: string,
+    @Req() request?: RequestLike,
+    @Res({ passthrough: true }) response?: RateLimitHeaderResponse,
+  ) {
+    await consumePublicRateLimit(
+      this.apiRateLimitService,
+      this.configService,
+      'workload_ownership',
+      request,
+      response,
+      'RATE_LIMIT_PUBLIC_READ_PER_MINUTE',
+    );
+    const id = parseUuid(workloadId, 'id');
+    return this.access.ownership('workload', id, await this.access.actor(request));
+  }
+
   /** ADR-0001 §3.5: move an anonymous workload (and its budgets, alerts, links) into a team. */
   @Post(':id/claim')
   async claim(

@@ -42,6 +42,13 @@ once tagged releases begin.
 
 ### Added
 
+- Tenancy in the web client, ADR-0001 step 4 part 1 (P2-1d). The web app now sends
+  the signed-in session on every core call, so comparisons made while signed in are
+  team-owned and stay reachable. Signing out or deleting the account clears this
+  browser's comparison history and edit keys. New endpoints:
+  `GET /comparisons/:id/ownership` and `GET /workloads/:id/ownership` (owner, team
+  name or expiry, the caller's role, `canChange`, `canClaim`), and `GET /comparisons`
+  for the active team's comparison list.
 - Anonymous data expires, ADR-0001 step 3 (P2-1c). Anonymous comparisons and
   workloads expire `ANONYMOUS_RETENTION_DAYS` (default 30) after creation and then
   read as `404`, along with their share links and budget alerts. Rows from before

@@ -3,6 +3,7 @@ import { flushSync } from 'react-dom';
 import { createRoot, Root } from 'react-dom/client';
 import { App, ComparisonView, ScrollProgressBar } from './App';
 import { PolyCostClient, PolyCostApiError } from './api-client';
+import { writeKeys } from './lib/write-keys';
 import {
   BackendHealthResponse,
   ComparisonResult,
@@ -14,6 +15,7 @@ import {
   RegionCatalogResponse,
   ReportExportJobResponse,
   TerraformGenerationResult,
+  ResourceOwnership,
 } from './types';
 import { intervalMultiplierFromMonthly } from './cost-time';
 import { buildNwsFromForm, defaultWorkloadForm } from './workload';
@@ -224,9 +226,14 @@ describe('App', () => {
     expect(client.revokeOtherSessions).toHaveBeenCalledWith('session-token');
     expect(text(container)).not.toContain('Other · last seen');
 
+    // ADR-0001 §3.7: signing out forgets this browser's edit keys and history.
+    writeKeys.rememberComparison('33333333-3333-4333-8333-333333333333', 'edit-key');
     await click(buttonByText(container, 'Sign out'));
     expect(client.logout).toHaveBeenCalledWith('session-token');
     expect(window.localStorage.getItem('polycost-auth-session-v1')).toBeNull();
+    expect(writeKeys.comparisonKey('33333333-3333-4333-8333-333333333333')).toBeUndefined();
+    expect(window.localStorage.getItem('polycost-comparison-history-v1')).toBeNull();
+    expect(text(container)).toContain('Local comparison history and edit keys were cleared');
 
     unmount();
   });
@@ -4087,6 +4094,16 @@ function diagramParseResult(
   };
 }
 
+const anonymousOwnership: ResourceOwnership = {
+  owner: 'anonymous',
+  teamId: null,
+  teamName: null,
+  expiresAt: '2099-01-01T00:00:00.000Z',
+  role: null,
+  canChange: true,
+  canClaim: false,
+};
+
 function clientMock(overrides: Partial<PolyCostClient> = {}): PolyCostClient {
   const parsed: ParsedNwsDraft = {
     draftNws: buildNwsFromForm(defaultWorkloadForm),
@@ -4561,6 +4578,17 @@ function clientMock(overrides: Partial<PolyCostClient> = {}): PolyCostClient {
     createComparison: jest.fn(async () => comparisonResult),
     generateTerraform: jest.fn(async () => terraformBundle),
     getComparison: jest.fn(async () => comparisonResult),
+    getComparisonOwnership: jest.fn(async () => anonymousOwnership),
+    getWorkloadOwnership: jest.fn(async () => anonymousOwnership),
+    listTeamComparisons: jest.fn(async () => []),
+    claimComparison: jest.fn(async (comparisonId: string) => ({
+      comparisonId,
+      teamId: '22222222-2222-4222-8222-222222222222',
+    })),
+    claimWorkload: jest.fn(async (workloadId: string) => ({
+      workloadId,
+      teamId: '22222222-2222-4222-8222-222222222222',
+    })),
     getComparisonAnalytics: jest.fn(async () => ({
       comparisonId: comparisonResult.comparisonId,
       generatedAt: '2026-07-02T12:00:00.000Z',

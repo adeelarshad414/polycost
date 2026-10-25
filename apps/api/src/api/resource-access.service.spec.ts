@@ -37,6 +37,16 @@ function service(options: {
   };
   Object.assign(repository, {
     claimResource: jest.fn(async () => options.claimed ?? true),
+    getOwnershipDetails: jest.fn(async () =>
+      options.owner
+        ? {
+            teamId: options.owner.teamId,
+            teamName: options.owner.teamId ? 'Acme' : null,
+            expiresAt: options.owner.teamId ? null : '2026-11-24T00:00:00.000Z',
+          }
+        : undefined,
+    ),
+    listTeamComparisons: jest.fn(async () => [{ comparisonId: RESOURCE }]),
   });
   const auth = {
     authenticateRequest: jest.fn(options.authenticate ?? (async () => identity(TEAM_A))),
@@ -218,5 +228,88 @@ describe('ResourceAccessService.claim', () => {
   it("404s another team's resource", async () => {
     const { access } = service({ owner: { teamId: TEAM_B }, roles });
     await expect(access.claim('comparison', RESOURCE, member)).rejects.toThrow(ApiNotFoundError);
+  });
+});
+
+// ADR-0001 §3.7: what the web app shows and enables.
+describe('ResourceAccessService.ownership', () => {
+  const key = 'right-key';
+
+  it('describes team data with the caller role; viewers cannot change it', async () => {
+    const member = service({
+      owner: { teamId: TEAM_A },
+      roles: { [`acct-a:${TEAM_A}`]: 'member' },
+    });
+    await expect(
+      member.access.ownership('comparison', RESOURCE, { identity: identity(TEAM_A) }),
+    ).resolves.toEqual({
+      owner: 'team',
+      teamId: TEAM_A,
+      teamName: 'Acme',
+      expiresAt: null,
+      role: 'member',
+      canChange: true,
+      canClaim: false,
+    });
+
+    const viewer = service({
+      owner: { teamId: TEAM_A },
+      roles: { [`acct-a:${TEAM_A}`]: 'viewer' },
+    });
+    await expect(
+      viewer.access.ownership('comparison', RESOURCE, { identity: identity(TEAM_A) }),
+    ).resolves.toMatchObject({ role: 'viewer', canChange: false });
+  });
+
+  it('404s team data for outsiders, like a read', async () => {
+    const { access } = service({ owner: { teamId: TEAM_A } });
+    await expect(access.ownership('workload', RESOURCE, {})).rejects.toThrow(ApiNotFoundError);
+  });
+
+  it.each<[string, Actor, boolean, boolean]>([
+    ['without the key', {}, false, false],
+    ['with the key, signed out', { writeKey: key }, true, false],
+    ['with the key, as a team member', { writeKey: key, identity: identity(TEAM_A) }, true, true],
+    [
+      'with the key, as a viewer',
+      { writeKey: key, identity: identity(TEAM_B, 'acct-b') },
+      true,
+      false,
+    ],
+  ])('anonymous data %s: canChange=%s canClaim=%s', async (_label, actor, canChange, canClaim) => {
+    const { access } = service({
+      owner: { teamId: null, writeKeyHash: hashWriteKey(key) },
+      roles: { [`acct-a:${TEAM_A}`]: 'member', [`acct-b:${TEAM_B}`]: 'viewer' },
+    });
+    await expect(access.ownership('comparison', RESOURCE, actor)).resolves.toEqual({
+      owner: 'anonymous',
+      teamId: null,
+      teamName: null,
+      expiresAt: '2026-11-24T00:00:00.000Z',
+      role: null,
+      canChange,
+      canClaim,
+    });
+  });
+});
+
+describe('ResourceAccessService.teamComparisons', () => {
+  it('lists the active team for any member, viewers included', async () => {
+    const { access, repository } = service({ roles: { [`acct-a:${TEAM_A}`]: 'viewer' } });
+    await expect(access.teamComparisons({ identity: identity(TEAM_A) }, 20)).resolves.toEqual([
+      { comparisonId: RESOURCE },
+    ]);
+    expect(
+      (repository as unknown as { listTeamComparisons: jest.Mock }).listTeamComparisons,
+    ).toHaveBeenCalledWith(TEAM_A, 20);
+  });
+
+  it.each<[string, Actor, new (...args: never[]) => Error]>([
+    ['signed out', {}, ApiUnauthorizedError],
+    ['without a team', { identity: identity(undefined) }, ApiForbiddenError],
+    ['after leaving the team', { identity: identity(TEAM_B) }, ApiForbiddenError],
+  ])('refuses %s', async (_label, actor, error) => {
+    const { access } = service({ roles: { [`acct-a:${TEAM_A}`]: 'member' } });
+    await expect(access.teamComparisons(actor)).rejects.toThrow(error);
   });
 });

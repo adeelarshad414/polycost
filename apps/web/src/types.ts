@@ -1849,3 +1849,28 @@ export interface ApiErrorDetail {
   field?: string;
   issue: string;
 }
+
+/** Who owns a comparison or workload, as the caller sees it (ADR-0001 §3.7). */
+export interface ResourceOwnership {
+  owner: 'team' | 'anonymous';
+  teamId: string | null;
+  teamName: string | null;
+  /** When anonymous data expires; null for team-owned data. */
+  expiresAt: string | null;
+  /** The caller's role in the owning team; null for anonymous data. */
+  role: string | null;
+  canChange: boolean;
+  canClaim: boolean;
+}
+
+/** One row of the active team's comparison list. */
+export interface TeamComparisonSummary {
+  comparisonId: string;
+  createdAt: string;
+  pricingAsOf: string;
+  workloadName: string | null;
+  workloadType: string | null;
+  cheapestProviderId: string | null;
+  cheapestMonthlyUsd: number | null;
+  providerCount: number;
+}
