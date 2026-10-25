@@ -74,6 +74,13 @@ export const writeKeys = {
   comparisonKey(comparisonId: string): string | undefined {
     return load().comparisons[comparisonId];
   },
+  /** Drop one comparison's key (a pasted key the API rejected). */
+  forgetComparison(comparisonId: string) {
+    const store = load();
+    const comparisons = { ...store.comparisons };
+    delete comparisons[comparisonId];
+    save({ ...store, comparisons });
+  },
   rememberWorkload(workloadId: string, writeKey: string) {
     const store = load();
     save({ ...store, workloads: bounded(store.workloads, workloadId, writeKey) });

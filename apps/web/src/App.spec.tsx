@@ -1692,6 +1692,37 @@ describe('App', () => {
     unmount();
   });
 
+  // ADR-0001 §3.7: the results page says who owns the comparison and drops
+  // the changes this caller cannot make.
+  it('shows ownership and hides live refresh for read-only callers', async () => {
+    const client = clientMock({
+      getComparisonOwnership: jest.fn(async () => ({
+        owner: 'team' as const,
+        teamId: '22222222-2222-4222-8222-222222222222',
+        teamName: 'Architecture team',
+        expiresAt: null,
+        role: 'viewer',
+        canChange: false,
+        canClaim: false,
+      })),
+    });
+    const { container, unmount } = render(<App client={client} />);
+
+    await click(buttonByText(container, 'Compare costs'));
+    await settleAsyncEffects();
+
+    expect(client.getComparisonOwnership).toHaveBeenCalledWith(comparisonResult.comparisonId);
+    expect(text(container)).toContain('Team: Architecture team');
+    expect(text(container)).toContain('View only');
+    expect(
+      Array.from(container.querySelectorAll('button')).some((button) =>
+        button.textContent?.includes('Refresh live catalog'),
+      ),
+    ).toBe(false);
+
+    unmount();
+  });
+
   it('clears requirements input and rendered cost breakdowns', async () => {
     const refreshDeferred = deferred<ComparisonResult>();
     const client = clientMock({

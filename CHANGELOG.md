@@ -42,6 +42,13 @@ once tagged releases begin.
 
 ### Added
 
+- The tenancy UI, ADR-0001 step 4 part 2 (P2-1d). The results page shows ownership:
+  the team name and the caller's role, or "Anonymous" with a countdown to its expiry.
+  Anonymous comparisons offer Copy edit key (it falls back to showing the key when
+  the clipboard is blocked), a field to paste a key from another browser (kept only
+  if the API accepts it), and Move to team. Read-only callers no longer see Refresh
+  live catalog. The workspace Overview gains a Team comparisons list that opens
+  saved comparisons through `/compare/:id`.
 - Tenancy in the web client, ADR-0001 step 4 part 1 (P2-1d). The web app now sends
   the signed-in session on every core call, so comparisons made while signed in are
   team-owned and stay reachable. Signing out or deleting the account clears this

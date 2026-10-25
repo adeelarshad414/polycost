@@ -236,3 +236,57 @@
     border-top: 0;
   }
 }
+
+/* ADR-0001 §3.7: who owns the comparison and what this browser may do. */
+.ownership-bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-1) var(--space-2);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-card);
+  background: var(--bg-surface);
+  padding: var(--space-1) var(--space-2);
+}
+
+.ownership-bar-status,
+.ownership-bar-actions,
+.ownership-bar-paste {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-1);
+}
+
+.ownership-bar-summary,
+.ownership-bar-paste label {
+  color: var(--text-secondary);
+  font-size: var(--fs-14);
+}
+
+.ownership-bar-paste input {
+  min-width: 0;
+  width: 16rem;
+  max-width: 100%;
+}
+
+.ownership-bar-key,
+.ownership-bar-error {
+  flex-basis: 100%;
+  margin: 0;
+  font-size: var(--fs-12);
+}
+
+.ownership-bar-key {
+  color: var(--text-secondary);
+  overflow-wrap: anywhere;
+}
+
+.ownership-bar-key code {
+  font-family: var(--font-mono);
+}
+
+.ownership-bar-error {
+  color: var(--danger);
+}

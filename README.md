@@ -324,6 +324,11 @@ Every comparison, workload and diagram import is either **team-owned** or
   whether this caller can change or claim it. `GET /comparisons` lists the active team's
   comparisons (session required, viewers included). The web app sends the session on
   every core call, and signing out clears this browser's comparison history and edit keys.
+- **In the web app:** the results page shows who owns the comparison ("Team: Acme", or
+  "Anonymous · Expires in 29 days"). Anonymous comparisons offer **Copy edit key**, a
+  **Have the edit key?** field for another browser, and **Move to team** when signed in.
+  Changes the caller cannot make, such as a viewer's live refresh, are not offered. The
+  workspace Overview lists the team's saved comparisons.
 - `ANONYMOUS_MODE=disabled` requires a session on every core route, for hosted
   multi-tenant deployments. Every route declares its access class, and a contract test
   fails CI if one does not. Callers can only reach a resource whose id they already have (list endpoints

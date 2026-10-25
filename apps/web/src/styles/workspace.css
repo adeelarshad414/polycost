@@ -53,3 +53,32 @@
   color: var(--text-muted);
   font-size: var(--fs-12);
 }
+
+/* ADR-0001 §3.7: the active team's saved comparisons. */
+.team-comparisons {
+  display: grid;
+  gap: var(--space-1-5);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.team-comparisons li {
+  display: grid;
+  gap: 2px;
+  border-left: 2px solid var(--brand-primary-soft-strong);
+  padding-left: var(--space-1-5);
+}
+
+.team-comparisons a {
+  color: var(--text-primary);
+  font-size: var(--fs-14);
+  font-weight: var(--fw-semibold);
+}
+
+.team-comparisons span,
+.team-comparisons-error {
+  margin: 0;
+  color: var(--text-muted);
+  font-size: var(--fs-12);
+}

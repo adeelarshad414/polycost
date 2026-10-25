@@ -356,6 +356,7 @@ import {
   TerraformNetworkTopology,
   TerraformRuntimeTarget,
   TerraformTargetCloud,
+  ResourceOwnership,
 } from './types';
 import {
   ARCHITECTURE_TEMPLATES,
@@ -393,6 +394,7 @@ const WorkspaceControlCenter = lazy(() =>
   })),
 );
 import { comparisonIdFromPath, comparisonPath } from './lib/comparison-route';
+import { OwnershipBar } from './features/tenancy/OwnershipBar';
 
 export function App({ client = polyCostClient }: AppProps) {
   const shareToken = shareTokenFromLocation();
@@ -1589,6 +1591,7 @@ export function App({ client = polyCostClient }: AppProps) {
             diagramFileName={diagramFileName}
             onIntervalChange={setInterval}
             onRefreshLive={handleRefreshLive}
+            onOwnershipNotice={setNotice}
             onExport={(format) => void handleExport(format)}
           />
         </>
@@ -2492,6 +2495,7 @@ function ProgressiveComparisonPage({
   onIntervalChange,
   onRefreshLive,
   onExport,
+  onOwnershipNotice,
 }: {
   client: PolyCostClient;
   openedFromLink?: boolean;
@@ -2547,7 +2551,13 @@ function ProgressiveComparisonPage({
   onIntervalChange: (interval: IntervalKey) => void;
   onRefreshLive: () => void;
   onExport: (format: ReportFormat) => void;
+  onOwnershipNotice?: (message: string) => void;
 }) {
+  // ADR-0001 §3.7: unknown ownership (older API, request failed) keeps every
+  // action; the API rejects what the caller may not do either way.
+  const [ownership, setOwnership] = useState<ResourceOwnership | null>(null);
+  const canChange = ownership?.canChange ?? true;
+  const refreshLive = canChange ? onRefreshLive : undefined;
   // The option the page is recommending; the service breakdown follows it rather
   // than pinning to a provider the reader has not been pointed at.
   const cheapestProviderResult = comparison
@@ -2610,6 +2620,13 @@ function ProgressiveComparisonPage({
 
             <StatusMessage notice={resultStatusNotice(notice)} error={error} />
 
+            <OwnershipBar
+              client={client}
+              comparisonId={comparison.comparisonId}
+              onOwnershipChange={setOwnership}
+              onNotice={onOwnershipNotice}
+            />
+
             {/*
               UI-4: answer first. The verdict, the four figures a decision needs and
               the sorted comparison come before anything that explains them.
@@ -2630,7 +2647,7 @@ function ProgressiveComparisonPage({
                     exportingFormat={exportingFormat}
                     completedExportFormat={completedExportFormat}
                     onExport={onExport}
-                    onRefreshLive={onRefreshLive}
+                    onRefreshLive={refreshLive}
                   />
                 }
               />
@@ -2718,7 +2735,7 @@ function ProgressiveComparisonPage({
                 onExport={onExport}
                 onIntervalChange={onIntervalChange}
                 onPricingModelChange={onPricingModelChange}
-                onRefreshLive={onRefreshLive}
+                onRefreshLive={refreshLive}
                 isComparisonPricingEvidenceLoading={isComparisonPricingEvidenceLoading}
               />
             </div>
@@ -2877,7 +2894,8 @@ function ResultQuickActions({
   completedExportFormat: ReportFormat | null;
   exportingFormat: ReportFormat | null;
   onExport: (format: ReportFormat) => void;
-  onRefreshLive: () => void;
+  /** Omitted when this caller cannot change the comparison (ADR-0001 §3.7). */
+  onRefreshLive?: () => void;
   /** Inside the verdict hero the headline is already stated; keep only context and actions. */
   compact?: boolean;
 }) {
@@ -2919,17 +2937,19 @@ function ResultQuickActions({
           exportingFormat={exportingFormat}
           onExport={onExport}
         />
-        <Button
-          type="button"
-          variant="secondary"
-          onClick={onRefreshLive}
-          loading={busyAction === 'refresh'}
-          loadingLabel="Refreshing..."
-          disabled={busyAction !== null && busyAction !== 'refresh'}
-        >
-          <RefreshIcon />
-          Refresh live catalog
-        </Button>
+        {onRefreshLive ? (
+          <Button
+            type="button"
+            variant="secondary"
+            onClick={onRefreshLive}
+            loading={busyAction === 'refresh'}
+            loadingLabel="Refreshing..."
+            disabled={busyAction !== null && busyAction !== 'refresh'}
+          >
+            <RefreshIcon />
+            Refresh live catalog
+          </Button>
+        ) : null}
       </div>
       <TaskQueue items={taskItems} />
     </section>
@@ -2973,7 +2993,7 @@ function StateDetailContent({
   onExport: (format: ReportFormat) => void;
   onIntervalChange: (interval: IntervalKey) => void;
   onPricingModelChange: (model: PricingModelKey) => void;
-  onRefreshLive: () => void;
+  onRefreshLive?: () => void;
 }) {
   const isLoading = busyAction === 'compare' || busyAction === 'refresh';
 
@@ -3085,17 +3105,19 @@ function StateDetailContent({
               exportingFormat={exportingFormat}
               onExport={onExport}
             />
-            <Button
-              type="button"
-              variant="secondary"
-              onClick={onRefreshLive}
-              loading={busyAction === 'refresh'}
-              loadingLabel="Refreshing..."
-              disabled={busyAction !== null && busyAction !== 'refresh'}
-            >
-              <RefreshIcon />
-              Refresh live catalog
-            </Button>
+            {onRefreshLive ? (
+              <Button
+                type="button"
+                variant="secondary"
+                onClick={onRefreshLive}
+                loading={busyAction === 'refresh'}
+                loadingLabel="Refreshing..."
+                disabled={busyAction !== null && busyAction !== 'refresh'}
+              >
+                <RefreshIcon />
+                Refresh live catalog
+              </Button>
+            ) : null}
           </div>
         </section>
       ),

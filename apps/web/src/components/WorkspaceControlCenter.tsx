@@ -14,6 +14,7 @@ import { formatApiError, type PolyCostClient } from './../api-client';
 import { Button } from './Button';
 import { ConfirmDialog } from './OverlayPrimitives';
 import { ResultTabs } from './ResultTabs';
+import { TeamComparisonsCard } from '../features/tenancy/TeamComparisonsCard';
 import { WorkspaceOverview } from '../features/workspace/WorkspaceOverview';
 import {
   isWorkspaceSection,
@@ -2717,16 +2718,25 @@ export function WorkspaceControlCenter({
           {
             id: 'overview',
             label: 'Overview',
-            hint: 'Team, invites, the latest invoice against its estimate, and recent activity.',
+            hint: 'Team, invites, the latest invoice against its estimate, recent activity and the team comparisons.',
             content: (
-              <WorkspaceOverview
-                session={session}
-                members={members}
-                invitations={invitations}
-                auditEvents={auditEvents}
-                reconciliation={reconciliation}
-                onNavigate={showSection}
-              />
+              <>
+                <WorkspaceOverview
+                  session={session}
+                  members={members}
+                  invitations={invitations}
+                  auditEvents={auditEvents}
+                  reconciliation={reconciliation}
+                  onNavigate={showSection}
+                />
+                {session?.activeTeam ? (
+                  <TeamComparisonsCard
+                    client={client}
+                    teamId={session.activeTeam.id}
+                    teamName={session.activeTeam.name}
+                  />
+                ) : null}
+              </>
             ),
           },
           {

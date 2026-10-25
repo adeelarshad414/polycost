@@ -83,6 +83,16 @@ describe('edit keys in the API client', () => {
     expect(writeKeys.alertKey('unknown')).toBeUndefined();
   });
 
+  it('forgets one comparison key without touching the others', () => {
+    writeKeys.rememberComparison('c-1', 'key-1');
+    writeKeys.rememberComparison('c-2', 'key-2');
+    writeKeys.forgetComparison('c-1');
+    resetWriteKeyCacheForTests();
+
+    expect(writeKeys.comparisonKey('c-1')).toBeUndefined();
+    expect(writeKeys.comparisonKey('c-2')).toBe('key-2');
+  });
+
   it('keeps working when storage is unavailable', () => {
     const setItem = jest.spyOn(Storage.prototype, 'setItem').mockImplementation(() => {
       throw new Error('blocked');
