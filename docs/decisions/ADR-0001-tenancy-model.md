@@ -215,7 +215,10 @@ team's comparison". Read access alone can't claim.
    sign-out and account deletion, and the read models the UI needs:
    `GET /comparisons/:id/ownership`, `GET /workloads/:id/ownership` and the team list
    `GET /comparisons`. Ownership answers are advisory; every change route still enforces
-   access itself. Part 2 is the UI on top of them.
+   access itself. Part 2 is the UI on top of them: the ownership bar on results (team and
+   role, or anonymous with its expiry; copy edit key, paste a key from another browser, move
+   to team), hiding changes the caller cannot make, and the Team comparisons list in the
+   workspace Overview.
 5. **P2-1e Docs.** Rewrite the README "Anonymous and Workspace Features" section and `11-SECURITY.md`
    authn/authz, correct REQUIREMENTS FR-6.5 / NFR-2.2, and update DIAGRAMS.
 
