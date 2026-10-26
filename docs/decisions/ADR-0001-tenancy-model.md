@@ -2,7 +2,7 @@
 
 |                |                                                                                                                                      |
 | -------------- | ------------------------------------------------------------------------------------------------------------------------------------ |
-| **Status**     | **Accepted** 2026-10-05 by the maintainer, with the decisions recorded in §6.                                                        |
+| **Status**     | **Accepted** 2026-10-05 by the maintainer, with the decisions recorded in §6. **Implemented** 2026-10-26 (P2-1a to P2-1e).           |
 | **Date**       | 2026-10-05                                                                                                                           |
 | **Audit**      | H-04 (High): "Core data is anonymous and not tenant-scoped". Also SEC-5 in `FULLSTACK-UX-AUDIT.md`.                                  |
 | **Decides**    | Who may read and change comparisons, workloads, budgets, alerts, share links, report exports and diagram imports.                    |
@@ -221,6 +221,12 @@ team's comparison". Read access alone can't claim.
    workspace Overview.
 5. **P2-1e Docs.** Rewrite the README "Anonymous and Workspace Features" section and `11-SECURITY.md`
    authn/authz, correct REQUIREMENTS FR-6.5 / NFR-2.2, and update DIAGRAMS.
+   _As delivered,_ this step also closed the last gaps in §7. A viewer's new comparison is
+   now anonymous, their own scratch copy, instead of entering the team. With anonymous mode
+   off, a viewer gets 403 instead. Creating team data is a write (§3.3), and this keeps the
+   app usable for viewers. The Compose E2E suite now covers share links and export jobs
+   across teams. A second E2E pass restarts the API with `ANONYMOUS_MODE=disabled` and
+   expects 401 from every core route, discovered from the controllers.
 
 ## 6. Decisions (resolved 2026-10-05)
 

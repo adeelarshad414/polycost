@@ -14,10 +14,12 @@ reviewed against and the reference for automated CI scanning.
 | User-submitted NL text | Prompt injection or traditional injection | NL input is the largest untrusted free-text surface |
 | Generated reports | CSV/Excel formula injection | Export files can execute formulas in spreadsheet apps |
 | Self-hosted deployments | Misconfiguration | OSS defaults must protect less-expert operators |
+| Team-owned comparisons, workloads, budgets, alerts, share links | Cross-tenant read or change | One team must never see or alter another's data (ADR-0001) |
+| Anonymous edit keys and session tokens | Theft from the browser | Either one lets the holder change data as its owner |
 
-PolyCost does not handle payment data, does not store end-user PII in the MVP, and
-does not execute user-supplied code. That narrows the MVP threat surface, but does not
-remove the need for secure defaults.
+PolyCost does not handle payment data and does not execute user-supplied code. Accounts
+store an email address and optional display name; there is no other end-user PII. That
+narrows the threat surface, but does not remove the need for secure defaults.
 
 ## 2. OWASP-aligned application security
 
@@ -46,13 +48,62 @@ handling.
 
 ### 2.3 Authentication and authorization
 
-- MVP is anonymous by design, so there is no end-user authn/authz surface.
-- Internal/admin endpoints, including `GET /pricing/status` and future admin
-  surfaces, are still protected.
-- MVP admin protection should use a simple admin API key checked via middleware, with
-  the key stored in Vault via `09-CONFIG-AND-SECRETS.md`.
-- Future account work requires a full rewrite of this section, including session
-  management, password storage, and RBAC.
+The model is decided in [ADR-0001](docs/decisions/ADR-0001-tenancy-model.md); this is
+what the code enforces today.
+
+**Every route declares an access class** (`apps/api/src/api/route-access.ts`), and a
+contract test fails CI if a route has none:
+
+| Class        | Who may call                                    | Enforced by                                        |
+| ------------ | ----------------------------------------------- | -------------------------------------------------- |
+| `public`     | Anyone: health, reference data, sign-in, `GET /share/:token` | Nothing beyond rate limits                       |
+| `core`       | Depends on who owns the data (below)            | `ResourceAccessService`, on every core route       |
+| `session`    | Signed-in accounts                              | `SessionAuthGuard`, then team checks in the service |
+| `admin-key`  | Operators (`GET /pricing/status`)               | `AdminApiKeyGuard`, key held in Vault              |
+| `scim-token` | An identity provider                            | A team SCIM bearer token                           |
+
+**Sessions.** Accounts sign in with a password (scrypt; every rejection takes the same
+path and message, with per-account lockout and rate limits) or through OIDC/SAML. A
+session is an opaque bearer token, stored server-side only as sha256, with a fixed
+expiry and no silent refresh; users can list and revoke their other sessions. A token
+that is sent but invalid is a 401. It never quietly falls back to anonymous.
+
+**Core data has two ownership modes.** Each comparison, workload and diagram import is
+stamped when it is created:
+
+- **Team-owned** (created with a session by an owner, admin or member). Only members of
+  the owning team can reach it, and everyone else gets **404, not 403**, so its
+  existence does not leak. Roles: `viewer` reads; `member` also changes; `owner` and
+  `admin` also manage team settings and revoke share links. Budgets, alerts, share
+  links and export jobs inherit their workload's or comparison's owner.
+- **Anonymous** (created without a session, or by a viewer, whose new comparisons stay
+  their own scratch copies instead of entering the team). Reading is a **capability
+  URL**: the random v4 UUID is the secret. Changing needs the **edit key**, 256 random
+  bits returned once at creation, stored as sha256 and sent as
+  `X-PolyCost-Write-Key`. Rows from before edit keys are read-only.
+  Anonymous data **expires** after `ANONYMOUS_RETENTION_DAYS` (30) and then reads as
+  404 (P2-1c).
+- **Claiming:** a signed-in member holding the edit key can move anonymous data into
+  their team (`POST …/claim`); it becomes team-only and stops expiring.
+- **`ANONYMOUS_MODE=disabled`** makes every core route require a session (401).
+  The Helm chart always sets it explicitly.
+
+**Verified by** the route-classification contract test; unit tests on
+`ResourceAccessService`; the Compose E2E suite, which checks that another team gets
+404 on comparisons, workloads, budgets, alerts, share links and export jobs, and that
+edit keys and claiming behave as described; and an E2E sweep that restarts the API
+with anonymous mode off and expects 401 from every core route.
+
+**Known limits** (tracked, not hidden):
+
+- An anonymous link is a bearer capability: anyone it is forwarded to can read the
+  data until it expires. Team-owned data has no such link.
+- The web app keeps the session token and edit keys in `localStorage`, so an XSS bug
+  would expose them. The strict CSP (audit P1-2) is the mitigation today; moving
+  sessions to `HttpOnly` cookies with CSRF protection is audit H-05 part 2, planned for
+  Phase 2.
+- `/ownership` endpoints tell the web app what to offer; they are advisory, and every
+  change route enforces access on its own.
 
 ### 2.4 Report generation security
 

@@ -9,6 +9,19 @@ once tagged releases begin.
 
 ### Security
 
+- ADR-0001 is complete (P2-1e), closing audit H-04. A viewer's new comparison or
+  workload is now anonymous, their own scratch copy, instead of being created in the
+  team; with `ANONYMOUS_MODE=disabled` a viewer gets 403. The Compose E2E suite now
+  also proves cross-team 404s on share links and export jobs, and a second pass
+  restarts the API with anonymous mode off and expects 401 from every core route,
+  found from the controllers rather than a list. That sweep found four routes (`GET /alerts`,
+  `POST /budgets`, `GET /pricing/breakdown`, `POST /share-links`) that answered a
+  signed-out caller with a validation 400 instead of 401. Each now identifies the
+  caller before reading its input. `11-SECURITY.md` §2.3 is rewritten:
+  it no longer says the MVP has no authn/authz surface. It now documents what is
+  enforced and the known limits, including the browser-held tokens that H-05 part 2
+  will move to cookies. REQUIREMENTS FR-6.x / NFR-2.2 and DIAGRAMS (a core-access
+  decision flowchart) are updated to match.
 - Release images re-apply Alpine security fixes at least daily: the `apk upgrade`
   layers in the api, web and migrations images take a `SECURITY_PATCH_STAMP` build
   arg (the UTC date in `release.yml`), so the GHA build cache can no longer replay a

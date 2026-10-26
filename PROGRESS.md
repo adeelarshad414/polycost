@@ -181,7 +181,7 @@ say so explicitly rather than marking it done.
 | Audit remediation - Phase 0 (stop-the-bleed)            | Complete                             | 2026-10-02   |
 | Audit remediation - Phase UI-0 to UI-8 (Aurora)         | Complete                             | 2026-10-02   |
 | Audit remediation - Phase 1 (production foundations)    | Complete                             | 2026-10-05   |
-| Audit remediation - Phase 2 (correctness and tenancy)   | In progress (P2-1a to P2-1d done)    | 2026-10-25   |
+| Audit remediation - Phase 2 (correctness and tenancy)   | In progress (tenancy P2-1 done)      | 2026-10-26   |
 | Audit remediation - Phase 3 (architecture and scale)    | Not started                          | 2026-10-25   |
 
 ## Audit remediation programme (audit of 2026-09-30)
@@ -190,16 +190,16 @@ The roadmap is section 6 (and 9.5 / 11 for UI) of `polycost-audit-2026-09-30.md`
 kept outside this repository. This section is the current snapshot; it is rewritten
 in place as work lands, and the dated log below it is append-only.
 
-### Overall: about 43% by effort, 71% by work item (2026-10-25)
+### Overall: about 43% by effort, 71% by work item (2026-10-26)
 
-| Phase                               | Work items       |     Done | Effort (est.)   | Status                                                          |
-| ----------------------------------- | ---------------- | -------: | --------------- | --------------------------------------------------------------- |
-| 0 - Stop-the-bleed                  | 12 actions       |       12 | ~1 week         | ✅ Complete (#244, #249) - gate "safe to demo" met              |
-| UI-0 to UI-8 - Aurora visual system | 9 phases         |        9 | ~7.5 weeks      | ✅ Complete (#236-#248)                                         |
-| 1 - Production foundations          | 8 (P1-1 to P1-8) |        8 | ~4 weeks        | ✅ Complete (#250, #256-#263) - gate "safe to deploy" met in CI |
-| 2 - Correctness and tenancy         | 8 workstreams    |      0.8 | ~6 weeks        | 🟡 In progress - tenancy (P2-1) is 4 of 5 steps                 |
-| 3 - Architecture and sustainability | 5 workstreams    |        0 | ~12 weeks       | ⬜ Not started                                                  |
-| **Total**                           | **42**           | **29.8** | **~30.5 weeks** | **~43% of effort, 71% of items**                                |
+| Phase                               | Work items       |   Done | Effort (est.)   | Status                                                          |
+| ----------------------------------- | ---------------- | -----: | --------------- | --------------------------------------------------------------- |
+| 0 - Stop-the-bleed                  | 12 actions       |     12 | ~1 week         | ✅ Complete (#244, #249) - gate "safe to demo" met              |
+| UI-0 to UI-8 - Aurora visual system | 9 phases         |      9 | ~7.5 weeks      | ✅ Complete (#236-#248)                                         |
+| 1 - Production foundations          | 8 (P1-1 to P1-8) |      8 | ~4 weeks        | ✅ Complete (#250, #256-#263) - gate "safe to deploy" met in CI |
+| 2 - Correctness and tenancy         | 8 workstreams    |      1 | ~6 weeks        | 🟡 In progress - tenancy (P2-1, H-04) done; 7 to go             |
+| 3 - Architecture and sustainability | 5 workstreams    |      0 | ~12 weeks       | ⬜ Not started                                                  |
+| **Total**                           | **42**           | **30** | **~30.5 weeks** | **~43% of effort, 71% of items**                                |
 
 The two figures differ because the remaining phases are the large ones: Phase 2
 and 3 are 13 of the 42 items but about 18 of the 30.5 estimated weeks. Use the
@@ -231,7 +231,11 @@ effort figure for planning.
   every core call, ownership and team-list endpoints, the ownership bar (team and
   role or anonymous expiry, copy or paste the edit key, move to team), read-only
   callers lose changes they cannot make, the Team comparisons list, and sign-out
-  clearing history and edit keys (#292 and the UI PR).
+  clearing history and edit keys (#292, #293); P2-1e - viewers no longer create
+  team data, E2E proof of cross-team 404s on share links and export jobs and of 401
+  on every core route with anonymous mode off, and the security, requirements,
+  README and diagram docs rewritten to match. ADR-0001 is implemented and audit H-04
+  is closed.
 - **Hygiene since then**: CodeQL triage, six findings fixed and the rest dismissed
   with reasons (#271); release images re-apply Alpine security fixes daily and zod
   4.6.7 (#281). Dependabot queue cleared on 2026-10-25: Actions bumps (#272, #274,
@@ -242,13 +246,12 @@ effort figure for planning.
 
 ### What next
 
-1. **P2-1e** - tenancy docs; closes H-04.
-2. **Rest of Phase 2**, in roadmap order: SCIM verified domains (H-01), cookie
+1. **Rest of Phase 2**, in roadmap order: SCIM verified domains (H-01), cookie
    sessions with CSRF (H-05 part 2), pricing truth with a nightly golden set
    (H-10, H-12), money as integer micro-dollars (M-04), Testcontainers
    integration tests (H-11), zod-to-OpenAPI contracts (M-08), safe VSDX parsing
    (M-03).
-3. **Phase 3**: enterprise-module scope ADR, backend modularisation, frontend
+2. **Phase 3**: enterprise-module scope ADR, backend modularisation, frontend
    re-architecture, one runtime target in IaC, governance.
 
 **Owner actions outstanding**: cut the first signed release (v0.2.0); run

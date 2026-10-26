@@ -295,7 +295,8 @@ The main API is versioned under `/api/v1`.
 
 PolyCost keeps the core comparison workflow frictionless. Anonymous users can still
 parse requirements, upload diagrams, run comparisons, inspect pricing evidence, export
-reports, and create share links.
+reports and create share links, as long as `ANONYMOUS_MODE=enabled` (the default).
+Signing in puts what they create into their team instead.
 
 ### Ownership: team-owned or anonymous (ADR-0001)
 
@@ -303,7 +304,8 @@ Every comparison, workload and diagram import is either **team-owned** or
 **anonymous**, decided when it is created
 ([ADR-0001](docs/decisions/ADR-0001-tenancy-model.md)):
 
-- **Team-owned:** created with a session. Only members of the owning team can read it
+- **Team-owned:** created with a session by an owner, admin or member (a viewer's new
+  comparisons stay anonymous, their own scratch copies). Only members of the owning team can read it
   (viewers read-only; revoking share links needs owner or admin), and everyone else gets
   `404`, so another team's data cannot even be confirmed to exist.
 - **Anonymous:** created without a session. Reading it is a **capability URL**, keyed
@@ -343,8 +345,9 @@ Abuse controls on this surface:
   cannot grow it without limit. Provider pricing APIs (AWS/Azure public price lists,
   GCP Cloud Billing Catalog) are free, so refresh-live has no per-call monetary cost;
   the rate limit bounds bandwidth/CPU.
-- Treat a comparison/share-link URL like a secret: anyone with the link can view the
-  report. Share links additionally support an optional password and revocation,
+- Treat an anonymous comparison URL or any share-link URL like a secret: anyone with the
+  link can view the report until it expires. A team-owned comparison URL is useless
+  to anyone outside the team. Share links additionally support an optional password and revocation,
   expire within 90 days, and are stored only as a SHA-256 hash, so a database or
   backup leak does not reveal working links.
 
