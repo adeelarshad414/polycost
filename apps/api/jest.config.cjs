@@ -19,6 +19,7 @@ module.exports = {
     '!src/**/*.module.ts',
     '!src/healthcheck.ts',
     '!src/**/*.spec.ts',
+    '!src/testing/**',
   ],
   coverageDirectory: '../../coverage/api',
   coverageThreshold: {

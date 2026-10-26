@@ -87,16 +87,36 @@ describe('ResourceAccessService.actor', () => {
 });
 
 describe('ResourceAccessService.ownerForCreate', () => {
-  it("stamps the caller's active team, or null when anonymous", () => {
-    const { access } = service({});
-    expect(access.ownerForCreate({ identity: identity(TEAM_A) })).toBe(TEAM_A);
-    expect(access.ownerForCreate({})).toBeNull();
-    expect(access.ownerForCreate({ identity: identity(undefined) })).toBeNull();
+  it("stamps the caller's active team when they can write there, or null when anonymous", async () => {
+    const { access } = service({ roles: { [`acct-a:${TEAM_A}`]: 'member' } });
+    await expect(access.ownerForCreate({ identity: identity(TEAM_A) })).resolves.toBe(TEAM_A);
+    await expect(access.ownerForCreate({})).resolves.toBeNull();
+    await expect(access.ownerForCreate({ identity: identity(undefined) })).resolves.toBeNull();
   });
 
-  it('requires a team when anonymous mode is disabled', () => {
+  // §3.3: creating team data is a write. A viewer gets an anonymous scratch
+  // copy instead, which never enters the team.
+  it.each(['viewer', undefined])(
+    'keeps a %s out of the team: anonymous when allowed',
+    async (role) => {
+      const { access } = service({ roles: role ? { [`acct-a:${TEAM_A}`]: role } : {} });
+      await expect(access.ownerForCreate({ identity: identity(TEAM_A) })).resolves.toBeNull();
+    },
+  );
+
+  it('refuses a viewer when anonymous mode is disabled', async () => {
+    const { access } = service({
+      anonymousMode: 'disabled',
+      roles: { [`acct-a:${TEAM_A}`]: 'viewer' },
+    });
+    await expect(access.ownerForCreate({ identity: identity(TEAM_A) })).rejects.toThrow(
+      'Viewers can read team data but not create it',
+    );
+  });
+
+  it('requires a team when anonymous mode is disabled', async () => {
     const { access } = service({ anonymousMode: 'disabled' });
-    expect(() => access.ownerForCreate({ identity: identity(undefined) })).toThrow(
+    await expect(access.ownerForCreate({ identity: identity(undefined) })).rejects.toThrow(
       ApiForbiddenError,
     );
   });

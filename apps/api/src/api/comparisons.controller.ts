@@ -70,7 +70,7 @@ export class ComparisonsController {
     );
     const actor = await this.access.actor(request);
     const parsed = parseCreateComparisonRequest(body);
-    const owner = this.access.ownerForCreate(actor);
+    const owner = await this.access.ownerForCreate(actor);
     // ADR-0001 §3.4: an anonymous comparison gets an edit key, returned once.
     const key = this.access.writeKeyFor(owner);
     const result = await this.comparisonApplicationService.createComparison(

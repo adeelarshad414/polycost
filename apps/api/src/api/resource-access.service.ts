@@ -105,13 +105,28 @@ export class ResourceAccessService {
   /**
    * The team that will own a new resource: the caller's active team, or null
    * (anonymous) when signed out or not yet in a team.
+   *
+   * Creating team data is a write, so it needs a write role (§3.3). A viewer's
+   * new comparison is anonymous instead - their own scratch copy, which never
+   * appears in the team and cannot be moved into it - so the app stays usable
+   * for them. With anonymous mode off there is no such copy, and they get 403.
    */
-  ownerForCreate(actor: Actor): string | null {
+  async ownerForCreate(actor: Actor): Promise<string | null> {
     const teamId = actor.identity?.teamId ?? null;
-    if (!teamId && !this.anonymousEnabled()) {
+    if (actor.identity && teamId) {
+      const role = await this.repository.getTeamRole(actor.identity.accountId, teamId);
+      if (role && WRITE_ROLES.has(role)) {
+        return teamId;
+      }
+      if (this.anonymousEnabled()) {
+        return null;
+      }
+      throw new ApiForbiddenError('Viewers can read team data but not create it');
+    }
+    if (!this.anonymousEnabled()) {
       throw new ApiForbiddenError('Create or join a team before creating comparisons');
     }
-    return teamId;
+    return null;
   }
 
   /** An edit key for a new anonymous resource; null for team-owned ones. */
@@ -297,7 +312,7 @@ function hasAuthorization(request: RequestWithAuth | undefined): request is Requ
  */
 export const OPEN_ACCESS = {
   actor: async (): Promise<Actor> => ({}),
-  ownerForCreate: (): string | null => null,
+  ownerForCreate: async (): Promise<string | null> => null,
   writeKeyFor: (): IssuedWriteKey | null => null,
   assert: async (): Promise<ResourceOwner> => ({ teamId: null, writeKeyHash: null }),
   claim: async (): Promise<{ teamId: string }> => ({ teamId: '' }),

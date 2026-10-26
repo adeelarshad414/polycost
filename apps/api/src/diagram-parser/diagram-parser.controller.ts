@@ -45,7 +45,7 @@ export class DiagramParserController {
       this.configService.get('RATE_LIMIT_DIAGRAM_PARSE_PER_MINUTE', { infer: true }),
     );
     writeRateLimitHeaders(response, rateLimit);
-    const ownerTeamId = this.access.ownerForCreate(await this.access.actor(request));
+    const ownerTeamId = await this.access.ownerForCreate(await this.access.actor(request));
 
     const decoded = this.diagramParserService.decode(body);
     const parsed = await this.diagramParserService.parse({

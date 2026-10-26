@@ -459,6 +459,49 @@ describe('MVP acceptance criteria E2E', () => {
         .status,
     ).toBe(404);
 
+    // ADR-0001 §7: share links and export jobs on another team's data are 404 too.
+    const shareBody = JSON.stringify({
+      workloadId: workload.id,
+      watermark: true,
+      expiresInDays: 7,
+      pricingModel: 'on-demand',
+      granularity: 'monthly',
+    });
+    expect(
+      (
+        await requestRaw('/share-links', {
+          method: 'POST',
+          body: shareBody,
+          headers: authHeaders(teamB.token),
+        })
+      ).status,
+    ).toBe(404);
+    expect((await requestRaw('/share-links', { method: 'POST', body: shareBody })).status).toBe(
+      404,
+    );
+    const exportBody = JSON.stringify({ format: 'csv' });
+    expect(
+      (
+        await requestRaw(`${path}/export-jobs`, {
+          method: 'POST',
+          body: exportBody,
+          headers: authHeaders(teamB.token),
+        })
+      ).status,
+    ).toBe(404);
+    const exportJob = await requestJson<{ jobId: string }>(`${path}/export-jobs`, {
+      method: 'POST',
+      body: exportBody,
+      headers: authHeaders(teamA.token),
+    });
+    expect(
+      (
+        await requestRaw(`${path}/export-jobs/${exportJob.jobId}`, {
+          headers: authHeaders(teamB.token),
+        })
+      ).status,
+    ).toBe(404);
+
     // ADR-0001 §3.4-3.5: anonymous data needs its edit key to change, and the
     // key holder can claim it into a team, after which it is team-only.
     const anonymousWorkload = await requestJson<WorkloadRecord & { writeKey: string }>(

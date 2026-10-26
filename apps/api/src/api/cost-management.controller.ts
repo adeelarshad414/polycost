@@ -101,8 +101,11 @@ export class CachedPricingController {
       'RATE_LIMIT_COMPARISON_PER_MINUTE',
     );
 
+    // ADR-0001: who is calling comes first, so a signed-out caller on a
+    // deployment without anonymous mode gets 401, never a validation error.
+    const actor = await this.access.actor(request);
     const workloadId = parseUuid(query.workloadId, 'workloadId');
-    await this.access.assert('workload', workloadId, await this.access.actor(request), 'read');
+    await this.access.assert('workload', workloadId, actor, 'read');
     const term = parsePricingTerm(query.term);
 
     return this.costManagementService.getWorkloadCostBreakdown(workloadId, term);
@@ -152,7 +155,7 @@ export class WorkloadsController {
     );
 
     const actor = await this.access.actor(request);
-    const owner = this.access.ownerForCreate(actor);
+    const owner = await this.access.ownerForCreate(actor);
     // ADR-0001 §3.4: an anonymous workload gets an edit key, returned once.
     const key = this.access.writeKeyFor(owner);
     const workload = await this.costManagementService.createWorkload(
@@ -179,8 +182,8 @@ export class WorkloadsController {
       response,
       'RATE_LIMIT_PUBLIC_READ_PER_MINUTE',
     );
-    const id = parseUuid(workloadId, 'id');
-    return this.access.ownership('workload', id, await this.access.actor(request));
+    const actor = await this.access.actor(request);
+    return this.access.ownership('workload', parseUuid(workloadId, 'id'), actor);
   }
 
   /** ADR-0001 §3.5: move an anonymous workload (and its budgets, alerts, links) into a team. */
@@ -198,8 +201,9 @@ export class WorkloadsController {
       response,
       'RATE_LIMIT_PUBLIC_WRITE_PER_MINUTE',
     );
+    const actor = await this.access.actor(request);
     const id = parseUuid(workloadId, 'id');
-    const claimed = await this.access.claim('workload', id, await this.access.actor(request));
+    const claimed = await this.access.claim('workload', id, actor);
 
     return { workloadId: id, teamId: claimed.teamId };
   }
@@ -230,13 +234,11 @@ export class BudgetsController {
       'RATE_LIMIT_PUBLIC_WRITE_PER_MINUTE',
     );
 
+    // ADR-0001: who is calling comes first, so a signed-out caller on a
+    // deployment without anonymous mode gets 401, never a validation error.
+    const actor = await this.access.actor(request);
     const input = parseBudgetInput(body);
-    await this.access.assert(
-      'workload',
-      input.workloadId,
-      await this.access.actor(request),
-      'write',
-    );
+    await this.access.assert('workload', input.workloadId, actor, 'write');
 
     return this.costManagementService.createBudget(input);
   }
@@ -270,8 +272,11 @@ export class AlertsController {
     // workloadId is REQUIRED: this is an anonymous capability-URL surface, so a
     // caller may only list alerts for a workload id they already hold. Allowing
     // it to be omitted previously returned every workload's alerts (data leak).
+    // ADR-0001: who is calling comes first, so a signed-out caller on a
+    // deployment without anonymous mode gets 401, never a validation error.
+    const actor = await this.access.actor(request);
     const id = parseUuid(workloadId, 'workloadId');
-    await this.access.assert('workload', id, await this.access.actor(request), 'read');
+    await this.access.assert('workload', id, actor, 'read');
 
     return this.costManagementService.listAlerts(id);
   }
@@ -292,8 +297,9 @@ export class AlertsController {
       'RATE_LIMIT_PUBLIC_WRITE_PER_MINUTE',
     );
 
+    const actor = await this.access.actor(request);
     const id = parseUuid(alertId, 'id');
-    await this.access.assert('alert', id, await this.access.actor(request), 'write');
+    await this.access.assert('alert', id, actor, 'write');
 
     return this.costManagementService.updateAlertDismissed(id, parseDismissedUpdate(body));
   }
@@ -324,13 +330,11 @@ export class ShareLinksController {
       'RATE_LIMIT_SHARE_LINK_PER_MINUTE',
     );
 
+    // ADR-0001: who is calling comes first, so a signed-out caller on a
+    // deployment without anonymous mode gets 401, never a validation error.
+    const actor = await this.access.actor(request);
     const input = parseShareLinkInput(body);
-    await this.access.assert(
-      'workload',
-      input.workloadId,
-      await this.access.actor(request),
-      'write',
-    );
+    await this.access.assert('workload', input.workloadId, actor, 'write');
 
     return this.costManagementService.createShareLink(input);
   }

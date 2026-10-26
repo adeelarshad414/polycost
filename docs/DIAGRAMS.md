@@ -259,6 +259,37 @@ sequenceDiagram
 > audit event fires those side effects on every prefetch, cache revalidation and
 > retry. Safe methods must stay safe.
 
+### C. Who may touch core data (ADR-0001)
+
+Every core route (comparisons, workloads, budgets, alerts, share-link management,
+exports) asks `ResourceAccessService` before it reads or writes.
+
+```mermaid
+flowchart TD
+    R["Core request"] --> T{"Bearer token sent?"}
+    T -->|"yes, invalid"| U401["401"]
+    T -->|"yes, valid"| O
+    T -->|"no"| M{"ANONYMOUS_MODE"}
+    M -->|"disabled"| U401
+    M -->|"enabled"| O
+    O{"Resource owner<br/>(expired anonymous = missing)"} -->|"not found"| N404["404"]
+    O -->|"team"| MEM{"Caller in that team?"}
+    MEM -->|"no"| N404
+    MEM -->|"yes"| ROLE{"Role allows it?<br/>viewer reads · member writes<br/>owner and admin manage"}
+    ROLE -->|"no"| F403["403"]
+    ROLE -->|"yes"| OK["Allowed"]
+    O -->|"anonymous"| RW{"Read or change?"}
+    RW -->|"read"| OK
+    RW -->|"change"| KEY{"Edit key matches?"}
+    KEY -->|"no"| F403
+    KEY -->|"yes"| OK
+```
+
+> 🔒 Outsiders get **404**, not 403, so another team's data cannot be confirmed to
+> exist. A route's access class is declared in code and a contract test fails CI
+> when one is missing; the Compose E2E suite checks the 404s across teams and, with
+> anonymous mode off, a 401 from every core route.
+
 ---
 
 ## 🔑 Credentials flow
@@ -470,7 +501,7 @@ stateDiagram-v2
 
 ```mermaid
 stateDiagram-v2
-    [*] --> live: created without a session (expires in ANONYMOUS_RETENTION_DAYS)
+    [*] --> live: created anonymously (expires in ANONYMOUS_RETENTION_DAYS)
     [*] --> unstamped: created before expiry existed
     unstamped --> live: first retention sweep (grace period)
     live --> team_owned: claimed with session and edit key

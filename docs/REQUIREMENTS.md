@@ -73,11 +73,12 @@
 | ID     | Requirement                                                 | Status |
 | ------ | ----------------------------------------------------------- | :----: |
 | FR-6.1 | Local accounts and sessions                                 |   ✅   |
-| FR-6.2 | Teams with owner/admin/member roles                         |   ✅   |
+| FR-6.2 | Teams with owner/admin/member/viewer roles                  |   ✅   |
 | FR-6.3 | Invitations with pending/accepted/revoked/expired lifecycle |   ✅   |
 | FR-6.4 | Enterprise SSO (OIDC / SAML) and SCIM provisioning          |   ✅   |
-| FR-6.5 | Tenant-scoped access on team-owned resources                |   ✅   |
+| FR-6.5 | Team-owned data is visible to its team only (404 otherwise) |   ✅   |
 | FR-6.6 | Immutable team audit trail with delivery outbox             |   ✅   |
+| FR-6.7 | Anonymous data: edit key to change, claim, 30-day expiry    |   ✅   |
 
 ### FR-7 · Outputs
 
@@ -103,15 +104,15 @@
 
 ### NFR-2 · Security
 
-| ID      | Requirement                                 | How it is enforced           |
-| ------- | ------------------------------------------- | ---------------------------- |
-| NFR-2.1 | No secret in the database, logs, or browser | Vault-only secret values     |
-| NFR-2.2 | All tenant data is access-checked           | Guards + team scoping        |
-| NFR-2.3 | Destructive operations cannot cross tenants | Team-scoped deletes          |
-| NFR-2.4 | No SSRF via provider-supplied URLs          | Same-origin pagination guard |
-| NFR-2.5 | Requests cannot be amplified into a DoS     | NWS array caps, rate limits  |
-| NFR-2.6 | SQL is always parameterised                 | Repository layer             |
-| NFR-2.7 | Mock auth routes are unusable in production | Environment gating           |
+| ID      | Requirement                                 | How it is enforced                                                    |
+| ------- | ------------------------------------------- | --------------------------------------------------------------------- |
+| NFR-2.1 | No secret in the database, logs, or browser | Vault-only secret values                                              |
+| NFR-2.2 | All tenant data is access-checked           | Route access classes + `ResourceAccessService`; contract test and E2E |
+| NFR-2.3 | Destructive operations cannot cross tenants | Team-scoped deletes                                                   |
+| NFR-2.4 | No SSRF via provider-supplied URLs          | Same-origin pagination guard                                          |
+| NFR-2.5 | Requests cannot be amplified into a DoS     | NWS array caps, rate limits                                           |
+| NFR-2.6 | SQL is always parameterised                 | Repository layer                                                      |
+| NFR-2.7 | Mock auth routes are unusable in production | Environment gating                                                    |
 
 ### NFR-3 · Reliability & durability
 

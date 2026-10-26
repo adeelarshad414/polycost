@@ -104,6 +104,9 @@ try {
     printComposeDiagnostics();
   } else {
     run(npmCommand, ['run', 'live:verify'], { timeoutMs: commandTimeoutMs });
+    if (!skipCompose) {
+      await runAnonymousDisabledSweep();
+    }
   }
 } catch (error) {
   runnerFailure = error;
@@ -131,6 +134,41 @@ if (runnerFailure) {
 
 if (testsFailed) {
   process.exit(process.exitCode ?? 1);
+}
+
+// ADR-0001 §7: the same stack with anonymous mode off must answer 401 on every
+// core route without a session. Only the API container is recreated (compose
+// reads ANONYMOUS_MODE from the environment); the database and data stay.
+async function runAnonymousDisabledSweep() {
+  process.env.ANONYMOUS_MODE = 'disabled';
+  run('docker', ['compose', 'up', '-d', '--no-deps', 'api'], { timeoutMs: commandTimeoutMs });
+  await waitForJson('API health (ANONYMOUS_MODE=disabled)', `${apiOrigin}/health`, (body) => {
+    return body?.status === 'ok' && body?.service === 'polycost-api';
+  });
+
+  const sweep = spawnSync(
+    npmCommand,
+    [
+      'run',
+      'test:e2e',
+      '--workspace',
+      '@polycost/api',
+      '--',
+      '--testPathPatterns',
+      'anonymous-disabled',
+    ],
+    {
+      cwd: root,
+      stdio: 'inherit',
+      timeout: commandTimeoutMs,
+      env: { ...process.env, POLYCOST_E2E_ANONYMOUS_MODE: 'disabled' },
+    },
+  );
+  if (sweep.error || sweep.status !== 0) {
+    testsFailed = true;
+    process.exitCode = sweep.status ?? 1;
+    printComposeDiagnostics();
+  }
 }
 
 function run(command, args, options = {}) {
