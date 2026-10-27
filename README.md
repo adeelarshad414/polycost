@@ -374,16 +374,19 @@ Accounts add workspace controls on top of that core flow:
   events, and attaches active SCIM users as workspace members. The workspace Team
   access panel shows active token/user posture, token metadata, provisioned users,
   one-time token creation, and token revocation. This is an integration foundation,
-  not formal SCIM certification or a complete hosted IAM suite. Operator setup
-  guidance lives in `docs/ENTERPRISE-IDP-ONBOARDING.md`.
+  not formal SCIM certification or a complete hosted IAM suite. SCIM provisions only
+  addresses on email domains the team has **verified with a DNS TXT record** (Team
+  panel → Verified domains), so an IdP cannot create or take over another
+  organisation's accounts (audit H-01). Operator setup guidance lives in
+  `docs/ENTERPRISE-IDP-ONBOARDING.md`.
 - Enterprise IdP pilot evidence can be checked with
   `npm run enterprise:idp:evidence:check -- --require-managed-idp <bundle.json>`
   after a real Okta, Microsoft Entra, Auth0, Google Workspace, generic OIDC, or
   generic SAML pilot. The default sample is schema-only evidence, not production
   IAM certification.
-- Three-role RBAC: Owner, Admin, and Member. Owners manage role changes; owners and
-  admins manage members, invitations, SSO provider configuration, and billing import
-  workflows; members keep comparison and report access.
+- Four roles: Owner, Admin, Member and Viewer. Owners manage role changes; owners and
+  admins manage members, invitations, SSO, SCIM, verified domains and billing import
+  workflows; members create and change comparisons; viewers read team data only.
 - OIDC/SAML configuration readiness with redirect URI display, stored provider
   metadata, mock connection testing, and a signed mock OIDC start/callback flow in
   the workspace UI for development verification.

@@ -82,3 +82,52 @@
   color: var(--text-muted);
   font-size: var(--fs-12);
 }
+
+/* Audit H-01: email domains the team owns. */
+.team-domains {
+  display: grid;
+  gap: var(--space-1-5);
+}
+
+.team-domains-list {
+  display: grid;
+  gap: var(--space-1);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.team-domains-list li {
+  display: grid;
+  gap: var(--space-0-5);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-control);
+  padding: var(--space-1) var(--space-1-5);
+}
+
+.team-domains-head,
+.team-domains-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-1);
+}
+
+.team-domains-record,
+.team-domains-error {
+  margin: 0;
+  font-size: var(--fs-12);
+  overflow-wrap: anywhere;
+}
+
+.team-domains-record {
+  color: var(--text-secondary);
+}
+
+.team-domains-record code {
+  font-family: var(--font-mono);
+}
+
+.team-domains-error {
+  color: var(--danger);
+}

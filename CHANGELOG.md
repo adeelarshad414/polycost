@@ -9,6 +9,18 @@ once tagged releases begin.
 
 ### Security
 
+- SCIM is scoped to verified email domains (audit H-01, target state). A team now
+  proves it owns a domain with a DNS TXT record (`_polycost-verification.<domain>`)
+  before its SCIM token may create, replace or reactivate users on it, and only one
+  team can hold a domain verified (migration 046). Nobody can pre-claim a stranger's
+  address or pull another organisation's account into their team, while a domain's
+  owner can still link its own people who registered before SSO. Shared mailbox
+  domains cannot be claimed, and deactivation never needs the domain. The workspace
+  Team panel gains a Verified domains section. New owner/admin API:
+  `GET/POST /auth/teams/:teamId/domains`, `POST …/:domainId/verify`,
+  `DELETE …/:domainId`, all audited. `DOMAIN_VERIFICATION_MODE=development-auto`
+  verifies without DNS on local and CI stacks and is refused in staging and
+  production. The Helm chart always renders `dns`.
 - Browser sessions are an HttpOnly cookie with CSRF protection (audit H-05 part 2).
   The web app signs in with `X-PolyCost-Session: cookie`, and the API sets
   `polycost_session` (`HttpOnly`, `SameSite=Lax`, `Path=/api`, `Secure` unless

@@ -15,6 +15,7 @@ import { Button } from './Button';
 import { ConfirmDialog } from './OverlayPrimitives';
 import { ResultTabs } from './ResultTabs';
 import { TeamComparisonsCard } from '../features/tenancy/TeamComparisonsCard';
+import { TeamDomainsPanel } from '../features/workspace/TeamDomainsPanel';
 import { WorkspaceOverview } from '../features/workspace/WorkspaceOverview';
 import {
   isWorkspaceSection,
@@ -2056,6 +2057,14 @@ export function WorkspaceControlCenter({
                 : ''}
             </small>
           </div>
+          {activeTeam && canManageTeam ? (
+            <TeamDomainsPanel
+              client={client}
+              teamId={activeTeam.id}
+              token={token}
+              onNotice={onNotice}
+            />
+          ) : null}
           <div className="workspace-sso-status workspace-scim-status">
             <span>SCIM provisioning</span>
             <strong>

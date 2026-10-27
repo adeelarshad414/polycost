@@ -181,7 +181,7 @@ say so explicitly rather than marking it done.
 | Audit remediation - Phase 0 (stop-the-bleed)            | Complete                             | 2026-10-02   |
 | Audit remediation - Phase UI-0 to UI-8 (Aurora)         | Complete                             | 2026-10-02   |
 | Audit remediation - Phase 1 (production foundations)    | Complete                             | 2026-10-05   |
-| Audit remediation - Phase 2 (correctness and tenancy)   | In progress (P2-1, H-05 done)        | 2026-10-27   |
+| Audit remediation - Phase 2 (correctness and tenancy)   | In progress (P2-1, H-05, H-01 done)  | 2026-10-27   |
 | Audit remediation - Phase 3 (architecture and scale)    | Not started                          | 2026-10-25   |
 
 ## Audit remediation programme (audit of 2026-09-30)
@@ -190,16 +190,16 @@ The roadmap is section 6 (and 9.5 / 11 for UI) of `polycost-audit-2026-09-30.md`
 kept outside this repository. This section is the current snapshot; it is rewritten
 in place as work lands, and the dated log below it is append-only.
 
-### Overall: about 46% by effort, 74% by work item (2026-10-27)
+### Overall: about 48% by effort, 76% by work item (2026-10-27)
 
-| Phase                               | Work items       |   Done | Effort (est.)   | Status                                                            |
-| ----------------------------------- | ---------------- | -----: | --------------- | ----------------------------------------------------------------- |
-| 0 - Stop-the-bleed                  | 12 actions       |     12 | ~1 week         | ✅ Complete (#244, #249) - gate "safe to demo" met                |
-| UI-0 to UI-8 - Aurora visual system | 9 phases         |      9 | ~7.5 weeks      | ✅ Complete (#236-#248)                                           |
-| 1 - Production foundations          | 8 (P1-1 to P1-8) |      8 | ~4 weeks        | ✅ Complete (#250, #256-#263) - gate "safe to deploy" met in CI   |
-| 2 - Correctness and tenancy         | 8 workstreams    |      2 | ~6 weeks        | 🟡 In progress - tenancy (H-04) and sessions (H-05) done; 6 to go |
-| 3 - Architecture and sustainability | 5 workstreams    |      0 | ~12 weeks       | ⬜ Not started                                                    |
-| **Total**                           | **42**           | **31** | **~30.5 weeks** | **~46% of effort, 74% of items**                                  |
+| Phase                               | Work items       |   Done | Effort (est.)   | Status                                                                      |
+| ----------------------------------- | ---------------- | -----: | --------------- | --------------------------------------------------------------------------- |
+| 0 - Stop-the-bleed                  | 12 actions       |     12 | ~1 week         | ✅ Complete (#244, #249) - gate "safe to demo" met                          |
+| UI-0 to UI-8 - Aurora visual system | 9 phases         |      9 | ~7.5 weeks      | ✅ Complete (#236-#248)                                                     |
+| 1 - Production foundations          | 8 (P1-1 to P1-8) |      8 | ~4 weeks        | ✅ Complete (#250, #256-#263) - gate "safe to deploy" met in CI             |
+| 2 - Correctness and tenancy         | 8 workstreams    |      3 | ~6 weeks        | 🟡 In progress - tenancy (H-04), sessions (H-05), SCIM (H-01) done; 5 to go |
+| 3 - Architecture and sustainability | 5 workstreams    |      0 | ~12 weeks       | ⬜ Not started                                                              |
+| **Total**                           | **42**           | **32** | **~30.5 weeks** | **~48% of effort, 76% of items**                                            |
 
 The two figures differ because the remaining phases are the large ones: Phase 2
 and 3 are 13 of the 42 items but about 18 of the 30.5 estimated weeks. Use the
@@ -241,6 +241,11 @@ effort figure for planning.
   page script or `localStorage`. Dead cookies are cleared, bearer tokens still work
   for API clients, invite tokens are in the URL fragment and sent by POST, and the
   flow was checked in a real browser against the Compose stack.
+- **SCIM target state (H-01)**: SCIM provisions only email domains the team has
+  verified with a DNS TXT record (one verified owner per domain, migration 046),
+  replacing the Phase 0 members-and-invitees containment. A Verified domains panel
+  and audited owner/admin API, checked against Postgres 16 and in the live SCIM
+  journey.
 - **Hygiene since then**: CodeQL triage, six findings fixed and the rest dismissed
   with reasons (#271); release images re-apply Alpine security fixes daily and zod
   4.6.7 (#281). Dependabot queue cleared on 2026-10-25: Actions bumps (#272, #274,
@@ -251,7 +256,7 @@ effort figure for planning.
 
 ### What next
 
-1. **Rest of Phase 2**, in roadmap order: SCIM verified domains (H-01), pricing truth with a nightly golden set
+1. **Rest of Phase 2**, in roadmap order: pricing truth with a nightly golden set
    (H-10, H-12), money as integer micro-dollars (M-04), Testcontainers
    integration tests (H-11), zod-to-OpenAPI contracts (M-08), safe VSDX parsing
    (M-03).

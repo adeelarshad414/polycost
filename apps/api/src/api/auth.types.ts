@@ -55,6 +55,9 @@ export type TeamAuditAction =
   | 'team.scim_token.revoked'
   | 'team.scim.user_upserted'
   | 'team.scim.user_deactivated'
+  | 'team.domain.added'
+  | 'team.domain.verified'
+  | 'team.domain.removed'
   | 'billing.import.created'
   | 'billing.reconciliation.created'
   | 'billing.reconciliation.artifact_registered'
@@ -75,6 +78,7 @@ export type TeamAuditTargetType =
   | 'sso_provider'
   | 'scim_token'
   | 'scim_user'
+  | 'domain'
   | 'billing_import'
   | 'billing_reconciliation';
 
@@ -270,4 +274,21 @@ export interface RequestWithAuth {
    * then clears it, so the browser stops sending it (audit H-05 part 2).
    */
   clearSessionCookie?: boolean;
+}
+
+/** A team's claim on an email domain (audit H-01). */
+export interface TeamDomainRecord {
+  id: string;
+  teamId: string;
+  domain: string;
+  status: 'pending' | 'verified';
+  /** The DNS TXT record that proves ownership. */
+  verificationRecord: {
+    type: 'TXT';
+    name: string;
+    value: string;
+  };
+  createdAt: string;
+  lastCheckedAt?: string;
+  verifiedAt?: string;
 }

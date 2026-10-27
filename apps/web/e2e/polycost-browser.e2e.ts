@@ -681,6 +681,21 @@ async function expectNoClippedContent(page: Page): Promise<void> {
 
 /** WCAG 2.2 A/AA scan; serious and critical findings fail, with their targets listed. */
 async function expectNoSeriousAxeViolations(page: Page, label: string): Promise<void> {
+  // Scan the settled page. Mid fade-in, opacity makes axe report contrast the
+  // finished page does not have (it flaked on .pricing-model-badge). Infinite
+  // animations - spinners, shimmer - are skipped, and the wait is bounded
+  // because a paused or scroll-linked animation may never report finished.
+  await page.evaluate(() =>
+    Promise.race([
+      Promise.all(
+        document
+          .getAnimations()
+          .filter((animation) => animation.effect?.getComputedTiming().iterations !== Infinity)
+          .map((animation) => animation.finished.catch(() => undefined)),
+      ),
+      new Promise((resolve) => setTimeout(resolve, 3_000)),
+    ]),
+  );
   const results = await new AxeBuilder({ page })
     .withTags(['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa', 'wcag22aa'])
     .analyze();
