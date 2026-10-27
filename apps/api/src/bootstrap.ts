@@ -1,4 +1,5 @@
 import fastifyHelmet from '@fastify/helmet';
+import { clearedSessionCookie } from './api/session-cookie.js';
 import type { NestFastifyApplication } from '@nestjs/platform-fastify';
 import {
   REQUEST_ID_HEADER,
@@ -172,6 +173,7 @@ export async function configureApp(
   allowedOrigins: string[],
   metrics?: MetricsService,
   requestLogger?: { log(message: unknown, context?: string): void },
+  options: { secureCookies?: boolean } = {},
 ): Promise<void> {
   const httpInstance = (
     app.getHttpAdapter() as { getInstance(): Parameters<typeof registerRequestContext>[0] }
@@ -184,9 +186,14 @@ export async function configureApp(
     registerMetricsHook(httpInstance as never, metrics, requestLogger);
   }
 
+  registerDeadSessionCookieClearing(httpInstance as never, options.secureCookies ?? true);
+
   await app.register(fastifyHelmet);
+  // credentials: the web app sends its HttpOnly session cookie (H-05). Safe
+  // only because origins are an explicit allowlist, never a wildcard.
   app.enableCors({
     origin: allowedOrigins,
+    credentials: true,
   });
 
   // Nest disables shutdown hooks by default. Without this call none of the
@@ -195,6 +202,32 @@ export async function configureApp(
   // Postgres pools unclosed and - more damaging - BullMQ workers undrained, so
   // in-flight jobs could be lost, or redelivered and processed twice.
   app.enableShutdownHooks();
+}
+
+/**
+ * H-05: when a request arrived with a session cookie that no longer resolves
+ * (expired, revoked, account disabled), clear it in the same response, so the
+ * browser stops sending it and the next call goes through as signed out.
+ */
+export function registerDeadSessionCookieClearing(
+  instance: {
+    addHook(
+      name: 'onSend',
+      hook: (
+        request: { clearSessionCookie?: boolean },
+        reply: { hasHeader(name: string): boolean; header(name: string, value: string): unknown },
+        payload: unknown,
+      ) => Promise<unknown>,
+    ): unknown;
+  },
+  secure: boolean,
+): void {
+  instance.addHook('onSend', async (request, reply, payload) => {
+    if (request.clearSessionCookie && !reply.hasHeader('set-cookie')) {
+      reply.header('set-cookie', clearedSessionCookie(secure));
+    }
+    return payload;
+  });
 }
 
 export function corsOriginsFromConfig(value: string): string[] {

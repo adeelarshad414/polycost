@@ -43,11 +43,11 @@ describe('AuthController', () => {
       userAgent: 'jest',
     });
 
-    expect(controller.me(request)).toBe('me');
-    expect(controller.logout(request)).toBe('logout');
+    await expect(controller.me(request)).resolves.toBe('me');
+    await expect(controller.logout(request)).resolves.toBe('logout');
     expect(controller.updateProfile(body, request)).toBe('profile');
     expect(controller.changePassword(body, request)).toBe('password');
-    expect(controller.deleteAccount(body, request)).toBe('account');
+    await expect(controller.deleteAccount(body, request)).resolves.toBe('account');
     expect(controller.listSessions(request)).toBe('sessions');
     expect(controller.revokeOtherSessions(request)).toBe('revoke-other');
     expect(controller.switchActiveTeam(body, request)).toBe('switch-team');
@@ -64,7 +64,9 @@ describe('AuthController', () => {
     expect(controller.revokeTeamInvitation('team-1', 'invite-1', request)).toBe('revoke-invite');
     expect(controller.resendTeamInvitation('team-1', 'invite-1', request)).toBe('resend-invite');
     expect(controller.acceptInvitation(body, request)).toBe('accept-invite');
-    await expect(controller.previewInvitation('invite-token')).resolves.toBe('preview-invite');
+    await expect(controller.previewInvitation({ token: 'invite-token' })).resolves.toBe(
+      'preview-invite',
+    );
     expect(controller.ssoStatus(request)).toBe('sso-status');
     await expect(controller.startMockOidcLogin(body)).resolves.toBe('sso-start');
     await expect(controller.mockOidcAuthorize(body)).resolves.toBe('sso-authorize');

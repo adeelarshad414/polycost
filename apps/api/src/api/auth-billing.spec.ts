@@ -282,7 +282,7 @@ describe('AuthService', () => {
     );
 
     expect(invitation.inviteToken).toEqual(expect.any(String));
-    expect(invitation.inviteUrl).toContain('/?invite_token=');
+    expect(invitation.inviteUrl).toContain('/#invite_token=');
     expect(repository.createTeamInvitation).toHaveBeenCalledWith(
       expect.objectContaining({
         email: 'finops@example.com',
@@ -327,7 +327,7 @@ describe('AuthService', () => {
     );
 
     expect(resent.inviteToken).toEqual(expect.any(String));
-    expect(resent.inviteUrl).toContain('/?invite_token=');
+    expect(resent.inviteUrl).toContain('/#invite_token=');
     expect(repository.resendTeamInvitation).toHaveBeenCalledWith(
       expect.objectContaining({
         invitationId: '88888888-8888-4888-8888-888888888888',
@@ -392,7 +392,7 @@ describe('AuthService', () => {
     );
     expect(deliveryService.deliverTeamInvitation).toHaveBeenCalledWith(
       expect.objectContaining({
-        inviteUrl: expect.stringContaining('/?invite_token='),
+        inviteUrl: expect.stringContaining('/#invite_token='),
         action: 'created',
         invitedBy: {
           accountId: identity.accountId,

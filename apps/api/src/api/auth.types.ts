@@ -263,5 +263,11 @@ export interface TeamSwitchResponse {
 export interface RequestWithAuth {
   headers?: Record<string, unknown>;
   ip?: string;
+  method?: string;
   auth?: AuthIdentity;
+  /**
+   * Set when the session cookie was dead (expired or revoked): the response
+   * then clears it, so the browser stops sending it (audit H-05 part 2).
+   */
+  clearSessionCookie?: boolean;
 }

@@ -290,6 +290,33 @@ flowchart TD
 > when one is missing; the Compose E2E suite checks the 404s across teams and, with
 > anonymous mode off, a 401 from every core route.
 
+### D. Browser session: an HttpOnly cookie plus a CSRF token (audit H-05)
+
+```mermaid
+sequenceDiagram
+    autonumber
+    participant B as 🌐 Web SPA
+    participant A as ⚙️ API
+    participant D as 💾 Postgres
+
+    B->>A: POST /auth/login (X-PolyCost-Session: cookie)
+    A->>D: create session (stored as sha256)
+    A-->>B: Set-Cookie polycost_session (HttpOnly, SameSite=Lax) + csrfToken in JSON
+    Note over B: keeps csrfToken in memory, never the session
+    B->>A: POST /comparisons (cookie sent by the browser, X-CSRF-Token)
+    A->>A: session from cookie, CSRF = sha256(csrf + session)?
+    A-->>B: 201
+    Note over B: after a reload the CSRF token is gone
+    B->>A: GET /auth/me (cookie)
+    A-->>B: csrfToken again
+    B->>A: POST /auth/logout (cookie, X-CSRF-Token)
+    A-->>B: 200, Set-Cookie clears it
+```
+
+> 🔒 A change sent with the cookie but without the matching `X-CSRF-Token` is a 403.
+> API clients send `Authorization: Bearer` instead and need no CSRF token. A cookie
+> whose session has expired or been revoked is cleared in the 401 response.
+
 ---
 
 ## 🔑 Credentials flow

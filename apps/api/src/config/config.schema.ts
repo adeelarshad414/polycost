@@ -157,6 +157,9 @@ export const configSchema = z
     RATE_LIMIT_TERRAFORM_PER_MINUTE: z.coerce.number().int().positive().default(10),
     RATE_LIMIT_LIVE_REFRESH_PER_MINUTE: z.coerce.number().default(5),
     AUTH_SESSION_TTL_HOURS: z.coerce.number().int().positive().default(12),
+    // H-05: the browser session cookie carries `Secure`, so it is only sent over
+    // HTTPS. Turn off only for plain-http local development (compose does).
+    AUTH_COOKIE_SECURE: envBoolean(true),
     AUTH_PASSWORD_MIN_LENGTH: z.coerce.number().int().min(8).default(12),
     AUTH_MAX_FAILED_LOGIN_ATTEMPTS: z.coerce.number().int().min(3).default(5),
     AUTH_LOCKOUT_MINUTES: z.coerce.number().int().positive().default(15),

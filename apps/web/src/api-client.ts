@@ -1,4 +1,10 @@
-import { currentSessionToken } from './lib/session-token';
+import {
+  COOKIE_SESSION,
+  currentCsrfToken,
+  forgetCsrfToken,
+  hasCookieSessionHint,
+  rememberCsrfToken,
+} from './lib/session';
 import { writeKeyHeaders, writeKeys } from './lib/write-keys';
 import {
   ApiErrorDetail,
@@ -358,27 +364,42 @@ export function createPolyCostClient(baseUrl = configuredApiBaseUrl()): PolyCost
       return requestJson<DataHealthResponse>(baseUrl, '/data-health');
     },
     register(input) {
-      return requestJson<AuthSessionResponse>(baseUrl, '/auth/register', {
-        method: 'POST',
-        body: JSON.stringify(input),
-      });
+      return startCookieSession(
+        requestJson<AuthSessionResponse>(baseUrl, '/auth/register', {
+          method: 'POST',
+          headers: COOKIE_SESSION_REQUEST,
+          body: JSON.stringify(input),
+        }),
+      );
     },
     login(input) {
-      return requestJson<AuthSessionResponse>(baseUrl, '/auth/login', {
-        method: 'POST',
-        body: JSON.stringify(input),
-      });
+      return startCookieSession(
+        requestJson<AuthSessionResponse>(baseUrl, '/auth/login', {
+          method: 'POST',
+          headers: COOKIE_SESSION_REQUEST,
+          body: JSON.stringify(input),
+        }),
+      );
     },
-    getCurrentSession(token) {
-      return requestJson<AuthMeResponse>(baseUrl, '/auth/me', {
+    async getCurrentSession(token) {
+      const me = await requestJson<AuthMeResponse & { csrfToken?: string }>(baseUrl, '/auth/me', {
         headers: authorizationHeaders(token),
       });
+      // A reload loses the in-memory CSRF token; /auth/me hands it back.
+      if (me.csrfToken) rememberCsrfToken(me.csrfToken);
+      const rest: AuthMeResponse & { csrfToken?: string } = { ...me };
+      delete rest.csrfToken;
+      return rest;
     },
-    logout(token) {
-      return requestJson<{ revoked: true }>(baseUrl, '/auth/logout', {
-        method: 'POST',
-        headers: authorizationHeaders(token),
-      });
+    async logout(token) {
+      try {
+        return await requestJson<{ revoked: true }>(baseUrl, '/auth/logout', {
+          method: 'POST',
+          headers: authorizationHeaders(token),
+        });
+      } finally {
+        forgetCsrfToken();
+      }
     },
     updateAccountProfile(input, token) {
       return requestJson<AccountProfileResponse>(baseUrl, '/auth/profile', {
@@ -542,10 +563,11 @@ export function createPolyCostClient(baseUrl = configuredApiBaseUrl()): PolyCost
       });
     },
     previewTeamInvitation(tokenValue) {
-      return requestJson<TeamInvitationPreview>(
-        baseUrl,
-        `/auth/invitations/preview/${encodeURIComponent(tokenValue)}`,
-      );
+      // H-05: in the body, so the invite token stays out of URLs and logs.
+      return requestJson<TeamInvitationPreview>(baseUrl, '/auth/invitations/preview', {
+        method: 'POST',
+        body: JSON.stringify({ token: tokenValue }),
+      });
     },
     updateTeamMemberRole(teamId, accountId, role, token) {
       return requestJson<TeamMemberRecord>(
@@ -591,9 +613,10 @@ export function createPolyCostClient(baseUrl = configuredApiBaseUrl()): PolyCost
         params.set('displayName', input.displayName);
       }
 
-      return requestJson<SsoCallbackResponse>(
-        baseUrl,
-        `/auth/sso/oidc/callback?${params.toString()}`,
+      return startCookieSession(
+        requestJson<SsoCallbackResponse>(baseUrl, `/auth/sso/oidc/callback?${params.toString()}`, {
+          headers: COOKIE_SESSION_REQUEST,
+        }),
       );
     },
     configureSsoProvider(teamId, input, token) {
@@ -1006,10 +1029,28 @@ export function createPolyCostClient(baseUrl = configuredApiBaseUrl()): PolyCost
   };
 }
 
+/** Asks the API to set the session as an HttpOnly cookie (H-05). */
+const COOKIE_SESSION_REQUEST = { 'X-PolyCost-Session': 'cookie' };
+
+/**
+ * A cookie sign-in answers with the CSRF token instead of the session token.
+ * The CSRF token stays in memory, and the caller gets the COOKIE_SESSION
+ * marker where the token used to be, so it never holds the secret.
+ */
+async function startCookieSession<T extends { token?: string; csrfToken?: string }>(
+  pending: Promise<T>,
+): Promise<T & { token: string }> {
+  const { csrfToken, ...session } = await pending;
+  rememberCsrfToken(csrfToken);
+  return { ...session, token: session.token ?? COOKIE_SESSION } as T & { token: string };
+}
+
+/**
+ * Bearer only for a real token (API clients, tests). The browser's cookie
+ * session sends none; the cookie travels by itself.
+ */
 function authorizationHeaders(token: string): Record<string, string> {
-  return {
-    Authorization: `Bearer ${token}`,
-  };
+  return token && token !== COOKIE_SESSION ? { Authorization: `Bearer ${token}` } : {};
 }
 
 function createExportJobRequest(
@@ -1051,8 +1092,7 @@ async function downloadExportJobRequest(
   const url = `${baseUrl}/comparisons/${encodeURIComponent(
     comparisonId,
   )}/export-jobs/${encodeURIComponent(jobId)}/download`;
-  const headers = withSession({});
-  const response = await (Object.keys(headers).length > 0 ? fetch(url, { headers }) : fetch(url));
+  const response = await fetch(url, { credentials: 'include' });
 
   if (!response.ok) {
     throw await toApiError(response);
@@ -1116,8 +1156,9 @@ async function requestJson<T>(
   path = '',
   init: RequestInit = {},
 ): Promise<T> {
-  const headers = withSession(normalizeHeaders(init.headers));
   const method = init.method?.toUpperCase() ?? 'GET';
+  await ensureCsrfToken(baseUrlOrAbsoluteUrl, method);
+  const headers = withCsrf(normalizeHeaders(init.headers), method);
 
   if (
     (init.body !== undefined || method === 'GET' || method === 'HEAD') &&
@@ -1126,9 +1167,11 @@ async function requestJson<T>(
     headers['Content-Type'] = 'application/json';
   }
 
+  // The HttpOnly session cookie goes with every API call (H-05; ADR-0001 §3.7).
   const response = await fetch(`${baseUrlOrAbsoluteUrl}${path}`, {
     ...init,
     headers,
+    credentials: 'include',
   });
 
   if (!response.ok) {
@@ -1150,15 +1193,39 @@ async function requestJson<T>(
 }
 
 /**
- * Adds the signed-in session to a request that does not already name one, so
- * team-owned data stays reachable (ADR-0001 §3.7). Calls that pass a token
- * explicitly - the account and team endpoints - keep theirs.
+ * H-05: changes made with the cookie session carry the session-bound CSRF
+ * token. Requests that name a bearer token do not need it.
  */
-function withSession(headers: Record<string, string>): Record<string, string> {
-  const token = currentSessionToken();
-  return token && !hasHeader(headers, 'Authorization')
-    ? { ...headers, Authorization: `Bearer ${token}` }
+function withCsrf(headers: Record<string, string>, method: string): Record<string, string> {
+  const csrf = currentCsrfToken();
+  const safe = method === 'GET' || method === 'HEAD' || method === 'OPTIONS';
+  return csrf && !safe && !hasHeader(headers, 'Authorization')
+    ? { ...headers, 'X-CSRF-Token': csrf }
     : headers;
+}
+
+let pendingCsrf: Promise<void> | undefined;
+
+/**
+ * After a reload the CSRF token is gone from memory while the cookie session
+ * lives on. Before the first change, ask /auth/me for it once (shared by
+ * concurrent callers), so a quick "Compare costs" is not refused.
+ */
+async function ensureCsrfToken(baseUrl: string, method: string): Promise<void> {
+  if (method === 'GET' || method === 'HEAD' || currentCsrfToken() || !hasCookieSessionHint()) {
+    return;
+  }
+  pendingCsrf ??= fetch(`${baseUrl.replace(/\/$/, '')}/auth/me`, { credentials: 'include' })
+    .then(async (response) => {
+      if (!response.ok) return;
+      const body = (await response.json()) as { csrfToken?: string };
+      rememberCsrfToken(body.csrfToken);
+    })
+    .catch(() => undefined)
+    .finally(() => {
+      pendingCsrf = undefined;
+    });
+  await pendingCsrf;
 }
 
 function normalizeHeaders(headers: HeadersInit | undefined): Record<string, string> {

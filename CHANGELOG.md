@@ -9,6 +9,21 @@ once tagged releases begin.
 
 ### Security
 
+- Browser sessions are an HttpOnly cookie with CSRF protection (audit H-05 part 2).
+  The web app signs in with `X-PolyCost-Session: cookie`, and the API sets
+  `polycost_session` (`HttpOnly`, `SameSite=Lax`, `Path=/api`, `Secure` unless
+  `AUTH_COOKIE_SECURE=false`) and returns a CSRF token bound to the session instead
+  of the session token. Every cookie-authenticated change must send it as
+  `X-CSRF-Token` (403 otherwise). The page keeps that token in memory and gets it
+  back from `/auth/me` after a reload, fetching it on demand before the first
+  change. `localStorage` now holds only a non-secret "signed in" marker; a bearer
+  token stored by an earlier build is deleted, so people sign in once more. Dead
+  cookies are cleared in the 401 response, and CORS allows credentials for the
+  configured origins only. API clients keep `Authorization: Bearer`, with no CSRF
+  token needed. Invite links put the token in the URL fragment (`/#invite_token=`),
+  which browsers never send to a server, and the app strips it from the address
+  bar. The preview moved to `POST /auth/invitations/preview` with the token in the
+  body. The old `GET /auth/invitations/preview/:token` is removed.
 - ADR-0001 is complete (P2-1e), closing audit H-04. A viewer's new comparison or
   workload is now anonymous, their own scratch copy, instead of being created in the
   team; with `ANONYMOUS_MODE=disabled` a viewer gets 403. The Compose E2E suite now

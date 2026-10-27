@@ -395,6 +395,7 @@ const WorkspaceControlCenter = lazy(() =>
 );
 import { comparisonIdFromPath, comparisonPath } from './lib/comparison-route';
 import { OwnershipBar } from './features/tenancy/OwnershipBar';
+import { COOKIE_SESSION } from './lib/session';
 
 export function App({ client = polyCostClient }: AppProps) {
   const shareToken = shareTokenFromLocation();
@@ -12083,6 +12084,13 @@ function categoryCostSummaries(
 
 function readStoredAuthState(): { token: string; expired: boolean } {
   const token = window.localStorage.getItem(AUTH_SESSION_STORAGE_KEY) ?? '';
+
+  // H-05: earlier builds stored the bearer token itself. Drop it rather than
+  // keep a secret in storage; the session cookie replaces it at next sign-in.
+  if (token && token !== COOKIE_SESSION) {
+    clearStoredAuthToken();
+    return { token: '', expired: false };
+  }
   const expiresAt = window.localStorage.getItem(AUTH_SESSION_EXPIRES_AT_STORAGE_KEY) ?? '';
 
   if (!token) {

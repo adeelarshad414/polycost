@@ -1828,6 +1828,7 @@ describe('api client', () => {
     expect(fetchMock).toHaveBeenNthCalledWith(
       2,
       'http://api.test/api/v1/comparisons/comparison-1/export-jobs/job-1/download',
+      { credentials: 'include' },
     );
   });
 
@@ -1890,6 +1891,7 @@ describe('api client', () => {
     expect(fetchMock).toHaveBeenNthCalledWith(
       3,
       'http://api.test/api/v1/comparisons/comparison-1/export-jobs/job-1/download',
+      { credentials: 'include' },
     );
   });
 
@@ -2484,36 +2486,124 @@ describe('api client', () => {
       return { fetchMock, headersOf };
     }
 
-    it('sends the stored session on core calls', async () => {
-      window.localStorage.setItem('polycost-auth-session-v1', 'live-token');
-      window.localStorage.setItem('polycost-auth-session-expires-at-v1', '2099-01-01T00:00:00Z');
-      const { headersOf } = capture();
+    // H-05: the session is an HttpOnly cookie the page never sees.
+    it('sends the cookie with every call and never a stored token', async () => {
+      window.localStorage.setItem('polycost-auth-session-v1', 'cookie-session');
+      const { fetchMock, headersOf } = capture();
 
       await createPolyCostClient('http://api.test/api/v1').listTeamComparisons(20);
 
-      expect(headersOf(0).Authorization).toBe('Bearer live-token');
+      expect(headersOf(0).Authorization).toBeUndefined();
+      expect(((fetchMock.mock.calls[0] as unknown[])[1] as RequestInit).credentials).toBe(
+        'include',
+      );
     });
 
-    it('sends nothing when signed out or the session has expired', async () => {
-      const { headersOf } = capture();
+    it('signs in for a cookie session and keeps only the CSRF token, in memory', async () => {
+      const fetchMock = jest
+        .fn()
+        .mockResolvedValueOnce(
+          jsonResponse({ expiresAt: '2099-01-01T00:00:00Z', csrfToken: 'csrf-1', account: {} }),
+        )
+        .mockResolvedValue(jsonResponse({}));
+      global.fetch = fetchMock as typeof fetch;
       const client = createPolyCostClient('http://api.test/api/v1');
 
-      await client.getComparison('c1');
-      window.localStorage.setItem('polycost-auth-session-v1', 'dead-token');
-      window.localStorage.setItem('polycost-auth-session-expires-at-v1', '2000-01-01T00:00:00Z');
-      await client.getComparison('c1');
+      const session = await client.login({ email: 'a@example.com', password: 'x' });
+      expect(session.token).toBe('cookie-session');
+      expect(session).not.toHaveProperty('csrfToken');
+      const loginInit = fetchMock.mock.calls[0][1] as RequestInit;
+      expect((loginInit.headers as Record<string, string>)['X-PolyCost-Session']).toBe('cookie');
 
-      expect(headersOf(0).Authorization).toBeUndefined();
-      expect(headersOf(1).Authorization).toBeUndefined();
+      await client.createBudget({ workloadId: 'w1', thresholdUsd: 5 } as never);
+      await client.getComparison('c1');
+      const budgetHeaders = (fetchMock.mock.calls[1][1] as RequestInit).headers as Record<
+        string,
+        string
+      >;
+      const readHeaders = (fetchMock.mock.calls[2][1] as RequestInit).headers as Record<
+        string,
+        string
+      >;
+      expect(budgetHeaders['X-CSRF-Token']).toBe('csrf-1');
+      expect(readHeaders['X-CSRF-Token']).toBeUndefined();
+
+      await client.logout(session.token);
+      expect(
+        ((fetchMock.mock.calls[3][1] as RequestInit).headers as Record<string, string>)
+          .Authorization,
+      ).toBeUndefined();
+      await client.createBudget({ workloadId: 'w1', thresholdUsd: 5 } as never);
+      expect(
+        ((fetchMock.mock.calls[4][1] as RequestInit).headers as Record<string, string>)[
+          'X-CSRF-Token'
+        ],
+      ).toBeUndefined();
     });
 
-    it('keeps an explicitly passed token', async () => {
-      window.localStorage.setItem('polycost-auth-session-v1', 'stored-token');
+    it('recovers the CSRF token from /auth/me after a reload', async () => {
+      const fetchMock = jest
+        .fn()
+        .mockResolvedValueOnce(jsonResponse({ account: { id: 'a' }, csrfToken: 'csrf-2' }))
+        .mockResolvedValue(jsonResponse({}));
+      global.fetch = fetchMock as typeof fetch;
+      const client = createPolyCostClient('http://api.test/api/v1');
+
+      await expect(client.getCurrentSession('cookie-session')).resolves.toEqual({
+        account: { id: 'a' },
+      });
+      await client.claimComparison('c1');
+      expect(
+        ((fetchMock.mock.calls[1][1] as RequestInit).headers as Record<string, string>)[
+          'X-CSRF-Token'
+        ],
+      ).toBe('csrf-2');
+      await client.logout('cookie-session');
+    });
+
+    it('fetches the CSRF token once before the first change after a reload', async () => {
+      window.localStorage.setItem('polycost-auth-session-v1', 'cookie-session');
+      const fetchMock = jest.fn(async (url: string) =>
+        url.endsWith('/auth/me') ? jsonResponse({ csrfToken: 'csrf-3' }) : jsonResponse({}),
+      );
+      global.fetch = fetchMock as unknown as typeof fetch;
+      const client = createPolyCostClient('http://api.test/api/v1');
+
+      await Promise.all([
+        client.createBudget({ workloadId: 'w1', thresholdUsd: 5 } as never),
+        client.claimComparison('c1'),
+      ]);
+
+      const urls = fetchMock.mock.calls.map((call) => (call as unknown[])[0]);
+      expect(urls.filter((url) => String(url).endsWith('/auth/me'))).toHaveLength(1);
+      const changes = fetchMock.mock.calls.filter(
+        (call) => !String((call as unknown[])[0]).endsWith('/auth/me'),
+      );
+      for (const call of changes) {
+        expect(((call as unknown[])[1] as RequestInit).headers).toMatchObject({
+          'X-CSRF-Token': 'csrf-3',
+        });
+      }
+      await client.logout('cookie-session');
+    });
+
+    it('keeps an explicit bearer token and sends no CSRF token with it', async () => {
       const { headersOf } = capture();
 
       await createPolyCostClient('http://api.test/api/v1').getSsoStatus('explicit-token');
 
       expect(headersOf(0).Authorization).toBe('Bearer explicit-token');
+    });
+
+    it('previews an invitation with the token in the body', async () => {
+      const { fetchMock } = capture();
+
+      await createPolyCostClient('http://api.test/api/v1').previewTeamInvitation('invite-1');
+
+      const [url, init] = fetchMock.mock.calls[0] as unknown as [string, RequestInit];
+      expect(url).toBe('http://api.test/api/v1/auth/invitations/preview');
+      expect(init.method).toBe('POST');
+      expect(init.body).toBe(JSON.stringify({ token: 'invite-1' }));
     });
 
     it('reads ownership, lists the team and claims with the edit key', async () => {

@@ -374,12 +374,12 @@ async function verifyWorkspaceAuthJourney() {
   }
   markStep('created pending member invitation');
 
-  const preview = await apiJson(
-    `/api/v1/auth/invitations/preview/${encodeURIComponent(invitation.inviteToken)}`,
-    {
-      label: 'invitation preview',
-    },
-  );
+  // H-05: the invite token travels in the body, never the URL.
+  const preview = await apiJson('/api/v1/auth/invitations/preview', {
+    method: 'POST',
+    body: { token: invitation.inviteToken },
+    label: 'invitation preview',
+  });
   if (preview?.status !== 'pending' || preview.email !== memberEmail || preview.teamId !== teamId) {
     throw new Error(`Invitation preview returned unexpected payload: ${redactedJson(preview)}`);
   }

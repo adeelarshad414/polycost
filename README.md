@@ -331,6 +331,10 @@ Every comparison, workload and diagram import is either **team-owned** or
   **Have the edit key?** field for another browser, and **Move to team** when signed in.
   Changes the caller cannot make, such as a viewer's live refresh, are not offered. The
   workspace Overview lists the team's saved comparisons.
+- **Sessions in the browser** are an `HttpOnly` cookie that page scripts cannot read,
+  with a CSRF token on every change; API clients keep `Authorization: Bearer`
+  ([11-SECURITY.md](11-SECURITY.md) §2.3). Invite links put the token in the URL
+  fragment, which never reaches a server.
 - `ANONYMOUS_MODE=disabled` requires a session on every core route, for hosted
   multi-tenant deployments. Every route declares its access class, and a contract test
   fails CI if one does not. Callers can only reach a resource whose id they already have (list endpoints
