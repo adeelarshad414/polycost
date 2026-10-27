@@ -593,9 +593,11 @@ describe('MVP acceptance criteria E2E', () => {
     expect(invitation.role).toBe('member');
     expect(invitation.inviteToken).toEqual(expect.any(String));
 
-    const preview = await requestJson<TeamInvitationPreview>(
-      `/auth/invitations/preview/${encodeURIComponent(invitation.inviteToken!)}`,
-    );
+    // H-05: the invite token travels in the body, never the URL.
+    const preview = await requestJson<TeamInvitationPreview>('/auth/invitations/preview', {
+      method: 'POST',
+      body: JSON.stringify({ token: invitation.inviteToken }),
+    });
     expect(preview).toEqual(
       expect.objectContaining({
         status: 'pending',

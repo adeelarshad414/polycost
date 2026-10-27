@@ -14,7 +14,7 @@ import {
 import { ConfigService } from '@nestjs/config';
 import { AppConfig } from '../config/config.schema.js';
 import { AuthService } from './auth.service.js';
-import type { RequestWithAuth } from './auth.types.js';
+import type { AuthSessionResponse, RequestWithAuth } from './auth.types.js';
 import {
   ApiRateLimitService,
   requestIdentity,
@@ -22,6 +22,14 @@ import {
 } from './rate-limit.service.js';
 import type { RateLimitHeaderResponse } from './rate-limit.service.js';
 import { SessionAuthGuard } from './session-auth.guard.js';
+import {
+  SESSION_COOKIE,
+  clearedSessionCookie,
+  csrfTokenFor,
+  readCookie,
+  sessionCookie,
+  wantsCookieSession,
+} from './session-cookie.js';
 import { RouteAccess } from './route-access.js';
 
 @RouteAccess('public')
@@ -41,7 +49,11 @@ export class AuthController {
   ) {
     await this.consumeAuthRateLimit('auth_register', request, response);
 
-    return this.authService.register(body, requestMetadata(request));
+    return this.issueSession(
+      await this.authService.register(body, requestMetadata(request)),
+      request,
+      response,
+    );
   }
 
   @Post('login')
@@ -52,21 +64,34 @@ export class AuthController {
   ) {
     await this.consumeAuthRateLimit('auth_login', request, response);
 
-    return this.authService.login(body, requestMetadata(request));
+    return this.issueSession(
+      await this.authService.login(body, requestMetadata(request)),
+      request,
+      response,
+    );
   }
 
   @Get('me')
   @RouteAccess('session')
   @UseGuards(SessionAuthGuard)
-  me(@Req() request: RequestWithAuth) {
-    return this.authService.me(request.auth!);
+  async me(@Req() request: RequestWithAuth) {
+    const me = await this.authService.me(request.auth!);
+    // A cookie session needs the CSRF token for its changes; hand it to the
+    // page here, where other origins cannot read it.
+    const cookie = cookieSession(request);
+    return cookie ? { ...me, csrfToken: csrfTokenFor(cookie) } : me;
   }
 
   @Post('logout')
   @RouteAccess('session')
   @UseGuards(SessionAuthGuard)
-  logout(@Req() request: RequestWithAuth) {
-    return this.authService.logout(request.auth!);
+  async logout(
+    @Req() request: RequestWithAuth,
+    @Res({ passthrough: true }) response?: RateLimitHeaderResponse,
+  ) {
+    const result = await this.authService.logout(request.auth!);
+    response?.header('set-cookie', clearedSessionCookie(this.secureCookies()));
+    return result;
   }
 
   @Patch('profile')
@@ -86,8 +111,14 @@ export class AuthController {
   @Delete('account')
   @RouteAccess('session')
   @UseGuards(SessionAuthGuard)
-  deleteAccount(@Body() body: unknown, @Req() request: RequestWithAuth) {
-    return this.authService.deleteAccount(body, request.auth!);
+  async deleteAccount(
+    @Body() body: unknown,
+    @Req() request: RequestWithAuth,
+    @Res({ passthrough: true }) response?: RateLimitHeaderResponse,
+  ) {
+    const result = await this.authService.deleteAccount(body, request.auth!);
+    response?.header('set-cookie', clearedSessionCookie(this.secureCookies()));
+    return result;
   }
 
   @Get('sessions')
@@ -217,14 +248,20 @@ export class AuthController {
     return this.authService.acceptInvitation(body, request.auth!);
   }
 
-  @Get('invitations/preview/:token')
+  // H-05: the invite token travels in the body, not the URL, so it stays out
+  // of access logs, proxies and browser history.
+  @Post('invitations/preview')
   async previewInvitation(
-    @Param('token') token: string,
+    @Body() body: unknown,
     @Req() request?: RequestWithAuth,
     @Res({ passthrough: true }) response?: RateLimitHeaderResponse,
   ) {
     await this.consumeAuthRateLimit('auth_invitation_preview', request, response);
 
+    const token =
+      body && typeof body === 'object' && typeof (body as { token?: unknown }).token === 'string'
+        ? (body as { token: string }).token
+        : '';
     return this.authService.previewInvitation(token);
   }
 
@@ -265,7 +302,11 @@ export class AuthController {
   ) {
     await this.consumeAuthRateLimit('auth_sso_callback', request, response);
 
-    return this.authService.completeMockOidcCallback(query, requestMetadata(request));
+    return this.issueSession(
+      await this.authService.completeMockOidcCallback(query, requestMetadata(request)),
+      request,
+      response,
+    );
   }
 
   @Post('teams/:teamId/sso/providers')
@@ -290,6 +331,28 @@ export class AuthController {
     return this.authService.testSsoConnection(teamId, body, request.auth!);
   }
 
+  /**
+   * H-05: a browser that asks for a cookie session (`X-PolyCost-Session:
+   * cookie`) gets the token as an HttpOnly cookie and never sees it; the body
+   * carries the CSRF token instead. API clients keep the token in the body.
+   */
+  private issueSession<T extends AuthSessionResponse>(
+    session: T,
+    request: RequestWithAuth | undefined,
+    response: RateLimitHeaderResponse | undefined,
+  ): T | (Omit<T, 'token'> & { csrfToken: string }) {
+    if (!response || !wantsCookieSession(request?.headers)) {
+      return session;
+    }
+    const { token, ...rest } = session;
+    response.header('set-cookie', sessionCookie(token, session.expiresAt, this.secureCookies()));
+    return { ...rest, csrfToken: csrfTokenFor(token) };
+  }
+
+  private secureCookies(): boolean {
+    return this.configService.get('AUTH_COOKIE_SECURE', { infer: true }) !== false;
+  }
+
   private async consumeAuthRateLimit(
     scope: string,
     request: RequestWithAuth | undefined,
@@ -302,6 +365,15 @@ export class AuthController {
     );
     writeRateLimitHeaders(response, state);
   }
+}
+
+/** The session token when this request was authenticated by cookie, not bearer. */
+function cookieSession(request: RequestWithAuth | undefined): string | undefined {
+  const authorization = request?.headers?.authorization ?? request?.headers?.Authorization;
+  if (typeof authorization === 'string' && authorization.trim() !== '') {
+    return undefined;
+  }
+  return readCookie(request?.headers, SESSION_COOKIE);
 }
 
 function requestMetadata(request: RequestWithAuth | undefined): {

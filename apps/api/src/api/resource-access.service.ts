@@ -9,7 +9,7 @@ import {
   type ResourceOwner,
   type TeamComparisonSummary,
 } from './api-database.repository.js';
-import { AuthService } from './auth.service.js';
+import { AuthService, hasSessionCredential } from './auth.service.js';
 import type { AuthIdentity, RequestWithAuth } from './auth.types.js';
 
 /** Header carrying an anonymous resource's edit key (ADR-0001 §3.4). */
@@ -86,11 +86,11 @@ export class ResourceAccessService {
   async actor(request: RequestWithAuth | undefined): Promise<Actor> {
     const writeKey = headerValue(request, WRITE_KEY_HEADER);
     // Optional authentication by design (CodeQL js/user-controlled-bypass is a
-    // reviewed false positive here): leaving the header out can only make the
-    // caller anonymous, which has strictly fewer rights - team-owned resources
-    // still demand membership in assert(), and ANONYMOUS_MODE=disabled turns
-    // the anonymous path into a 401 below.
-    if (hasAuthorization(request)) {
+    // reviewed false positive here): leaving the session out - bearer header or
+    // cookie - can only make the caller anonymous, which has strictly fewer
+    // rights: team-owned resources still demand membership in assert(), and
+    // ANONYMOUS_MODE=disabled turns the anonymous path into a 401 below.
+    if (hasSessionCredential(request)) {
       return {
         identity: await this.authService.authenticateRequest(request),
         ...(writeKey ? { writeKey } : {}),
@@ -298,11 +298,6 @@ function writeKeyMatches(writeKey: string | undefined, expectedHash: string | nu
 function headerValue(request: RequestWithAuth | undefined, name: string): string | undefined {
   const value = request?.headers?.[name];
   return typeof value === 'string' && value.trim() !== '' ? value.trim() : undefined;
-}
-
-function hasAuthorization(request: RequestWithAuth | undefined): request is RequestWithAuth {
-  const value = request?.headers?.authorization ?? request?.headers?.Authorization;
-  return typeof value === 'string' && value.trim() !== '';
 }
 
 /**

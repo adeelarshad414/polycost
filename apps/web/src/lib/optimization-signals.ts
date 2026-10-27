@@ -7,6 +7,7 @@
 /* eslint-disable security/detect-object-injection -- Reviewed 2026-08-31: typed provider/category lookup maps carried over verbatim from App.tsx; no user-supplied key mutates an object on a privilege boundary; see docs/SECURITY-SUPPRESSIONS.md. */
 
 import { HOURS_PER_MONTH, intervalMultiplierFromMonthly } from '../cost-time';
+import { COOKIE_SESSION } from './session';
 import {
   APP_PLATFORM_MODEL_RATES,
   AUTH_SESSION_EXPIRES_AT_STORAGE_KEY,
@@ -1562,8 +1563,13 @@ export function storePricingModel(pricingModel: PricingModelKey): void {
   window.localStorage.setItem(PRICING_MODEL_STORAGE_KEY, pricingModel);
 }
 
-export function storeAuthSession(token: string, expiresAt: string | undefined): void {
-  window.localStorage.setItem(AUTH_SESSION_STORAGE_KEY, token);
+/**
+ * Remembers that this browser is signed in, and until when. H-05: never the
+ * session token itself - that lives in the HttpOnly cookie - so whatever the
+ * caller passes, only the non-secret COOKIE_SESSION marker is stored.
+ */
+export function storeAuthSession(_token: string, expiresAt: string | undefined): void {
+  window.localStorage.setItem(AUTH_SESSION_STORAGE_KEY, COOKIE_SESSION);
 
   if (expiresAt) {
     window.localStorage.setItem(AUTH_SESSION_EXPIRES_AT_STORAGE_KEY, expiresAt);

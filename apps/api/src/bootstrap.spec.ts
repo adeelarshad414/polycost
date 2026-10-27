@@ -54,6 +54,7 @@ describe('application bootstrap wiring', () => {
     expect(app.register).toHaveBeenCalledTimes(1);
     expect(app.enableCors).toHaveBeenCalledWith({
       origin: ['https://a.test', 'https://b.test'],
+      credentials: true,
     });
   });
 

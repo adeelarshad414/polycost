@@ -81,6 +81,15 @@ describe('ResourceAccessService.actor', () => {
     await expect(access.actor(bearer)).rejects.toThrow(ApiUnauthorizedError);
   });
 
+  // H-05: the web app's session arrives as a cookie, not a header.
+  it('resolves a session sent as a cookie', async () => {
+    const { access, auth } = service({});
+    await expect(access.actor({ headers: { cookie: 'polycost_session=abc' } })).resolves.toEqual({
+      identity: identity(TEAM_A),
+    });
+    expect(auth.authenticateRequest).toHaveBeenCalled();
+  });
+
   it('resolves a signed-in caller', async () => {
     await expect(service({}).access.actor(bearer)).resolves.toEqual({ identity: identity(TEAM_A) });
   });

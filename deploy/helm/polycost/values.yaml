@@ -183,6 +183,9 @@ config:
   # signed-in members' data is still isolated per team. disabled: every core
   # route requires a session - choose this for a hosted multi-tenant service.
   anonymousMode: enabled
+  # Audit H-05: the browser session cookie is Secure (HTTPS only). Leave true
+  # behind TLS; false only for a plain-http test cluster.
+  authCookieSecure: true
   # ADR-0001 P2-1c. Anonymous data expires this many days after creation
   # (reads 404 from then on); the retention sweep deletes it once
   # DATA_RETENTION_ENFORCEMENT_MODE=delete-expired. Rows that predate expiry

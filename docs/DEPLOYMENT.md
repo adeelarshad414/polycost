@@ -58,6 +58,7 @@ Start from `.env.example`. The most important runtime variables are:
 | Redis auth    | `REDIS_USERNAME`, `REDIS_PASSWORD` (secret), `REDIS_TLS`                                                       |
 | Workers       | `JOB_WORKERS_ENABLED` (false = HTTP only; a worker deployment runs jobs)                                       |
 | Tenancy       | `ANONYMOUS_MODE` (`enabled` default; `disabled` requires a session on core routes; Helm always sets it)        |
+| Sessions      | `AUTH_COOKIE_SECURE` (default `true`: the browser session cookie is HTTPS-only; `false` for plain-http dev)    |
 | Anon expiry   | `ANONYMOUS_RETENTION_DAYS` (30), `ANONYMOUS_RETENTION_GRACE_DAYS` (60, for rows that predate expiry)           |
 | Rate limits+  | `RATE_LIMIT_TERRAFORM_PER_MINUTE` (default 10)                                                                 |
 | Observability | `GRAFANA_PASSWORD` (required by the compose `observability` profile)                                           |

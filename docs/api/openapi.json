@@ -318,23 +318,24 @@
         }
       }
     },
-    "/api/v1/auth/invitations/preview/{token}": {
-      "get": {
+    "/api/v1/auth/invitations/preview": {
+      "post": {
         "summary": "Preview invitation",
         "operationId": "Auth_previewInvitation",
         "tags": [
           "Auth"
         ],
-        "parameters": [
-          {
-            "name": "token",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string"
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "additionalProperties": true
+              }
             }
           }
-        ],
+        },
         "responses": {
           "200": {
             "description": "Success"

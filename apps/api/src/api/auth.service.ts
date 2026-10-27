@@ -31,6 +31,7 @@ import {
 } from './auth.types.js';
 import { InvitationDeliveryService } from './invitation-delivery.service.js';
 import { burnPasswordCheck, hashPassword, verifyPassword } from './password-hash.js';
+import { SESSION_COOKIE, csrfHeaderMatches, isUnsafeMethod, readCookie } from './session-cookie.js';
 
 interface AuthRequestMetadata {
   ip?: string;
@@ -154,17 +155,31 @@ export class AuthService {
     return this.issueSession(account, metadata);
   }
 
+  /**
+   * The caller's session: a bearer token (API clients) or the HttpOnly session
+   * cookie (the web app, audit H-05 part 2). A cookie-authenticated change also
+   * needs the CSRF header, since the browser attaches the cookie by itself.
+   */
   async authenticateRequest(request: RequestWithAuth | undefined): Promise<AuthIdentity> {
-    const token = bearerToken(request?.headers);
+    const bearer = bearerToken(request?.headers);
+    const cookie = bearer ? undefined : readCookie(request?.headers, SESSION_COOKIE);
+    const token = bearer ?? cookie;
 
     if (!token) {
-      throw new ApiUnauthorizedError('Bearer session token is required');
+      throw new ApiUnauthorizedError('Sign in first: no session was sent');
     }
 
     const identity = await this.repository.resolveSession(sha256(token), new Date().toISOString());
 
     if (!identity) {
+      if (cookie && request) {
+        request.clearSessionCookie = true;
+      }
       throw new ApiUnauthorizedError('Session is expired or invalid');
+    }
+
+    if (cookie && isUnsafeMethod(request?.method) && !csrfHeaderMatches(request?.headers, cookie)) {
+      throw new ApiForbiddenError('This change needs the X-CSRF-Token header from your session');
     }
 
     return identity;
@@ -853,7 +868,9 @@ export class AuthService {
     identity: AuthIdentity,
     action: 'created' | 'resent',
   ): Promise<TeamInvitationRecord> {
-    const inviteUrl = `${this.publicBaseUrl()}/?invite_token=${encodeURIComponent(inviteToken)}`;
+    // H-05: the token rides in the fragment, which browsers never send to a
+    // server, so it stays out of web access logs, proxies and Referer headers.
+    const inviteUrl = `${this.publicBaseUrl()}/#invite_token=${encodeURIComponent(inviteToken)}`;
     const delivery = await this.invitationDeliveryService.deliverTeamInvitation({
       invitation,
       inviteUrl,
@@ -1396,6 +1413,14 @@ function teamSlug(teamName: string, email: string): string {
   const suffix = sha256(email).slice(0, 10);
 
   return `${base || 'polycost'}-${suffix}`;
+}
+
+/** A session was sent at all: a bearer token or the session cookie. */
+export function hasSessionCredential(request: RequestWithAuth | undefined): boolean {
+  return (
+    bearerToken(request?.headers) !== undefined ||
+    readCookie(request?.headers, SESSION_COOKIE) !== undefined
+  );
 }
 
 function bearerToken(headers: Record<string, unknown> | undefined): string | undefined {

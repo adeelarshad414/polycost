@@ -64,9 +64,28 @@ contract test fails CI if a route has none:
 
 **Sessions.** Accounts sign in with a password (scrypt; every rejection takes the same
 path and message, with per-account lockout and rate limits) or through OIDC/SAML. A
-session is an opaque bearer token, stored server-side only as sha256, with a fixed
-expiry and no silent refresh; users can list and revoke their other sessions. A token
+session is an opaque token, stored server-side only as sha256, with a fixed expiry
+and no silent refresh; users can list and revoke their other sessions. A session
 that is sent but invalid is a 401. It never quietly falls back to anonymous.
+
+- **The web app holds no token (audit H-05).** It signs in with
+  `X-PolyCost-Session: cookie`, and the API sets the session as a `polycost_session`
+  cookie: `HttpOnly`, `SameSite=Lax`, `Path=/api`, `Secure` unless
+  `AUTH_COOKIE_SECURE=false` (plain-http development only). No script on the page can
+  read it. `localStorage` keeps only a non-secret "signed in until" hint.
+- **CSRF.** A cookie-authenticated `POST`/`PATCH`/`PUT`/`DELETE` must send
+  `X-CSRF-Token` equal to `sha256("polycost-csrf:" + session)`. Only someone holding
+  the HttpOnly session can compute it; the page gets it from the sign-in and
+  `/auth/me` JSON, which other origins cannot read. CORS allows credentials for the
+  configured origin allowlist only, never a wildcard.
+- **Dead cookies are cleared.** A cookie whose session expired or was revoked gets a
+  401 and a `Set-Cookie` that removes it.
+- **API clients** keep using `Authorization: Bearer`, and a bearer request needs no
+  CSRF token.
+- **Invite tokens stay out of URLs servers see.** Invite links carry the token in the
+  fragment (`/#invite_token=…`), which browsers never send to a server; the app moves
+  it into memory and strips it from the address bar. The preview is a `POST` with
+  the token in the body.
 
 **Core data has two ownership modes.** Each comparison, workload and diagram import is
 stamped when it is created:
@@ -98,10 +117,10 @@ with anonymous mode off and expects 401 from every core route.
 
 - An anonymous link is a bearer capability: anyone it is forwarded to can read the
   data until it expires. Team-owned data has no such link.
-- The web app keeps the session token and edit keys in `localStorage`, so an XSS bug
-  would expose them. The strict CSP (audit P1-2) is the mitigation today; moving
-  sessions to `HttpOnly` cookies with CSRF protection is audit H-05 part 2, planned for
-  Phase 2.
+- Anonymous **edit keys** are still kept in `localStorage`: they are capability
+  secrets for data the browser created, and the user needs to copy them. An XSS bug
+  could read them (the strict CSP from audit P1-2 is the mitigation). The session is
+  no longer exposed this way (H-05).
 - `/ownership` endpoints tell the web app what to offer; they are advisory, and every
   change route enforces access on its own.
 

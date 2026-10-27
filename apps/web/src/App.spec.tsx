@@ -188,23 +188,23 @@ describe('App', () => {
       email: 'architect@example.com',
       password: 'correct horse battery staple',
     });
-    expect(window.localStorage.getItem('polycost-auth-session-v1')).toBe('session-token');
-    expect(client.getCurrentSession).toHaveBeenCalledWith('session-token');
-    expect(client.listAccountSessions).toHaveBeenCalledWith('session-token');
+    expect(window.localStorage.getItem('polycost-auth-session-v1')).toBe('cookie-session');
+    expect(client.getCurrentSession).toHaveBeenCalledWith('cookie-session');
+    expect(client.listAccountSessions).toHaveBeenCalledWith('cookie-session');
     expect(client.listTeamMembers).toHaveBeenCalledWith(
       '22222222-2222-4222-8222-222222222222',
-      'session-token',
+      'cookie-session',
     );
     expect(client.listTeamInvitations).toHaveBeenCalled();
     expect(client.listTeamScimTokens).toHaveBeenCalledWith(
       '22222222-2222-4222-8222-222222222222',
-      'session-token',
+      'cookie-session',
     );
     expect(client.listTeamScimUsers).toHaveBeenCalledWith(
       '22222222-2222-4222-8222-222222222222',
-      'session-token',
+      'cookie-session',
     );
-    expect(client.getSsoStatus).toHaveBeenCalledWith('session-token');
+    expect(client.getSsoStatus).toHaveBeenCalledWith('cookie-session');
     expect(text(container)).toContain('Architecture team · owner');
     expect(text(container)).toContain('Architect');
     expect(window.localStorage.getItem('polycost-auth-session-expires-at-v1')).toBe(
@@ -223,13 +223,13 @@ describe('App', () => {
     expect(text(container)).toContain('Other · last seen');
 
     await click(buttonByText(container, 'Sign out other devices'));
-    expect(client.revokeOtherSessions).toHaveBeenCalledWith('session-token');
+    expect(client.revokeOtherSessions).toHaveBeenCalledWith('cookie-session');
     expect(text(container)).not.toContain('Other · last seen');
 
     // ADR-0001 §3.7: signing out forgets this browser's edit keys and history.
     writeKeys.rememberComparison('33333333-3333-4333-8333-333333333333', 'edit-key');
     await click(buttonByText(container, 'Sign out'));
-    expect(client.logout).toHaveBeenCalledWith('session-token');
+    expect(client.logout).toHaveBeenCalledWith('cookie-session');
     expect(window.localStorage.getItem('polycost-auth-session-v1')).toBeNull();
     expect(writeKeys.comparisonKey('33333333-3333-4333-8333-333333333333')).toBeUndefined();
     expect(window.localStorage.getItem('polycost-comparison-history-v1')).toBeNull();
@@ -262,7 +262,7 @@ describe('App', () => {
   });
 
   it('clears expired stored workspace sessions while leaving anonymous comparison usable', async () => {
-    window.localStorage.setItem('polycost-auth-session-v1', 'expired-token');
+    window.localStorage.setItem('polycost-auth-session-v1', 'cookie-session');
     window.localStorage.setItem('polycost-auth-session-expires-at-v1', '2000-01-01T00:00:00.000Z');
     const client = clientMock();
     const { container, unmount } = render(<App client={client} />);
@@ -284,8 +284,39 @@ describe('App', () => {
     unmount();
   });
 
+  // H-05: older builds stored the bearer token itself. It must not survive.
+  it('drops a legacy stored session token instead of using it', async () => {
+    window.localStorage.setItem('polycost-auth-session-v1', 'raw-legacy-bearer-token');
+    window.localStorage.setItem('polycost-auth-session-expires-at-v1', '2099-01-01T00:00:00.000Z');
+    const client = clientMock();
+    const { unmount } = render(<App client={client} />);
+
+    await settleAsyncEffects();
+
+    expect(window.localStorage.getItem('polycost-auth-session-v1')).toBeNull();
+    expect(client.getCurrentSession).not.toHaveBeenCalled();
+
+    unmount();
+  });
+
+  // H-05: invite links carry the token in the fragment, and it is taken out of
+  // the address bar once the workspace has it.
+  it('reads an invite token from the fragment and strips it from the URL', async () => {
+    window.history.pushState({}, '', '/#invite_token=fragment-token');
+    const client = clientMock();
+    const { unmount } = render(<App client={client} />);
+
+    await settleAsyncEffects();
+
+    expect(client.previewTeamInvitation).toHaveBeenCalledWith('fragment-token');
+    expect(window.location.href).not.toContain('fragment-token');
+
+    window.history.replaceState({}, '', '/');
+    unmount();
+  });
+
   it('executes team invite, role, remove, and invite-acceptance actions', async () => {
-    window.localStorage.setItem('polycost-auth-session-v1', 'session-token');
+    window.localStorage.setItem('polycost-auth-session-v1', 'cookie-session');
     const client = clientMock({
       listTeamMembers: jest.fn(async () => [
         {
@@ -326,7 +357,7 @@ describe('App', () => {
         email: 'new-finops@example.com',
         role: 'admin',
       },
-      'session-token',
+      'cookie-session',
     );
     expect(text(container)).toContain('Invite token: invite-token');
     expect(text(container)).toContain('new-finops@example.com');
@@ -339,7 +370,7 @@ describe('App', () => {
       '22222222-2222-4222-8222-222222222222',
       '22222222-aaaa-4aaa-8aaa-222222222222',
       'admin',
-      'session-token',
+      'cookie-session',
     );
     expect(text(container)).toContain('Admin');
 
@@ -347,19 +378,19 @@ describe('App', () => {
     expect(client.removeTeamMember).toHaveBeenCalledWith(
       '22222222-2222-4222-8222-222222222222',
       '22222222-aaaa-4aaa-8aaa-222222222222',
-      'session-token',
+      'cookie-session',
     );
     expect(text(container)).not.toContain('FinOps Analyst');
 
     await changeInput(inputByWorkspaceLabel(container, 'Accept invite token'), 'invite-token');
     await submitForm(formContainingText(container, 'Accept invite token'));
-    expect(client.acceptTeamInvitation).toHaveBeenCalledWith('invite-token', 'session-token');
+    expect(client.acceptTeamInvitation).toHaveBeenCalledWith('invite-token', 'cookie-session');
 
     unmount();
   });
 
   it('creates and revokes SCIM tokens from team admin controls', async () => {
-    window.localStorage.setItem('polycost-auth-session-v1', 'session-token');
+    window.localStorage.setItem('polycost-auth-session-v1', 'cookie-session');
     const createdScimToken = {
       id: 'scim-token-1',
       teamId: '22222222-2222-4222-8222-222222222222',
@@ -426,7 +457,7 @@ describe('App', () => {
     expect(client.createTeamScimToken).toHaveBeenCalledWith(
       '22222222-2222-4222-8222-222222222222',
       { displayName: 'Okta production SCIM' },
-      'session-token',
+      'cookie-session',
     );
     expect(text(container)).toContain('SCIM token: pc_scim_new-secret');
     expect(text(container)).toContain('2 active tokens · 1 active users');
@@ -437,7 +468,7 @@ describe('App', () => {
     expect(client.revokeTeamScimToken).toHaveBeenCalledWith(
       '22222222-2222-4222-8222-222222222222',
       'scim-token-1',
-      'session-token',
+      'cookie-session',
     );
     expect(text(container)).not.toContain('SCIM token: pc_scim_new-secret');
     expect(text(container)).toContain('1 active tokens · 1 active users');
@@ -446,7 +477,7 @@ describe('App', () => {
   });
 
   it('shows invite delivery status when webhook delivery hides raw tokens', async () => {
-    window.localStorage.setItem('polycost-auth-session-v1', 'session-token');
+    window.localStorage.setItem('polycost-auth-session-v1', 'cookie-session');
     const client = clientMock({
       inviteTeamMember: jest.fn(async (_teamId, input) => ({
         id: '99999999-9999-4999-8999-999999999999',
@@ -481,7 +512,7 @@ describe('App', () => {
   });
 
   it('executes account lifecycle, team settings, invite revoke, and SSO actions', async () => {
-    window.localStorage.setItem('polycost-auth-session-v1', 'session-token');
+    window.localStorage.setItem('polycost-auth-session-v1', 'cookie-session');
     const client = clientMock({
       listTeamInvitations: jest.fn(async () => [
         {
@@ -515,7 +546,7 @@ describe('App', () => {
         displayName: 'Principal Architect',
         currentPassword: 'current-password',
       },
-      'session-token',
+      'cookie-session',
     );
 
     await changeInput(inputByWorkspaceLabel(container, 'Current password'), 'current-password');
@@ -527,14 +558,14 @@ describe('App', () => {
         currentPassword: 'current-password',
         newPassword: 'new-password-1234',
       },
-      'session-token',
+      'cookie-session',
     );
 
     await click(buttonByText(container, 'Resend'));
     expect(client.resendTeamInvitation).toHaveBeenCalledWith(
       '22222222-2222-4222-8222-222222222222',
       '88888888-8888-4888-8888-888888888888',
-      'session-token',
+      'cookie-session',
     );
     expect(text(container)).toContain('Invite token: refreshed-invite-token');
 
@@ -542,7 +573,7 @@ describe('App', () => {
     expect(client.revokeTeamInvitation).toHaveBeenCalledWith(
       '22222222-2222-4222-8222-222222222222',
       '88888888-8888-4888-8888-888888888888',
-      'session-token',
+      'cookie-session',
     );
     expect(text(container)).not.toContain('finops@example.com');
 
@@ -557,7 +588,7 @@ describe('App', () => {
         issuerUrl: 'https://idp.example.com',
         clientId: 'polycost-client',
       }),
-      'session-token',
+      'cookie-session',
     );
     expect(text(container)).toContain('OIDC configured · SAML ready');
 
@@ -568,7 +599,7 @@ describe('App', () => {
         providerType: 'oidc',
         issuerUrl: 'https://idp.example.com',
       }),
-      'session-token',
+      'cookie-session',
     );
 
     await changeInput(inputByWorkspaceLabel(container, 'New team'), 'Platform Council');
@@ -579,11 +610,11 @@ describe('App', () => {
       {
         teamName: 'Platform Council',
       },
-      'session-token',
+      'cookie-session',
     );
     expect(client.switchActiveTeam).toHaveBeenCalledWith(
       '55555555-5555-4555-8555-555555555555',
-      'session-token',
+      'cookie-session',
     );
     expect(selectByWorkspaceLabel(container, 'Active team').value).toBe(
       '55555555-5555-4555-8555-555555555555',
@@ -598,7 +629,7 @@ describe('App', () => {
       {
         teamName: 'Platform Guild',
       },
-      'session-token',
+      'cookie-session',
     );
 
     await changeInput(
@@ -629,7 +660,7 @@ describe('App', () => {
         confirmation: 'DELETE',
         currentPassword: 'current-password',
       },
-      'session-token',
+      'cookie-session',
     );
     expect(window.localStorage.getItem('polycost-auth-session-v1')).toBeNull();
 
@@ -637,7 +668,7 @@ describe('App', () => {
   });
 
   it('starts and completes the mock OIDC workspace session flow', async () => {
-    window.localStorage.setItem('polycost-auth-session-v1', 'session-token');
+    window.localStorage.setItem('polycost-auth-session-v1', 'cookie-session');
     const client = clientMock();
     const { container, unmount } = render(<App client={client} />);
 
@@ -661,7 +692,7 @@ describe('App', () => {
       state: 'signed',
       email: 'sso-user@example.com',
     });
-    expect(window.localStorage.getItem('polycost-auth-session-v1')).toBe('sso-session-token');
+    expect(window.localStorage.getItem('polycost-auth-session-v1')).toBe('cookie-session');
     expect(window.localStorage.getItem('polycost-auth-session-expires-at-v1')).toBe(
       '2099-07-07T00:00:00.000Z',
     );
@@ -671,7 +702,7 @@ describe('App', () => {
   });
 
   it('imports provider billing exports and reconciles them after a comparison exists', async () => {
-    window.localStorage.setItem('polycost-auth-session-v1', 'session-token');
+    window.localStorage.setItem('polycost-auth-session-v1', 'cookie-session');
     const client = clientMock();
     const { container, unmount } = render(<App client={client} />);
 
@@ -691,12 +722,12 @@ describe('App', () => {
         billingPeriodEnd: '2026-06-30',
         content: expect.stringContaining('Virtual Machines'),
       }),
-      'session-token',
+      'cookie-session',
     );
     expect(client.reconcileBillingImport).toHaveBeenCalledWith(
       '55555555-5555-4555-8555-555555555555',
       comparisonResult.comparisonId,
-      'session-token',
+      'cookie-session',
     );
     expect(text(container)).toContain('variance-warning');
     expect(text(container)).toContain('$7.00 variance');
@@ -732,7 +763,7 @@ describe('App', () => {
         billingPeriodStart: '2026-06-01',
         billingPeriodEnd: '2026-06-30',
       }),
-      'session-token',
+      'cookie-session',
     );
     expect(text(container)).toContain(
       'Artifact metadata: 1 registered · 0 verified · metadata registered not verified',
@@ -754,7 +785,7 @@ describe('App', () => {
         legalHold: false,
         content: expect.stringContaining('artifact_id=artifact-1'),
       }),
-      'session-token',
+      'cookie-session',
     );
     expect(text(container)).toContain('Stored file: aws-invoice-control-66666666.txt');
     expect(text(container)).toContain('sha256 dddddddddddd');
@@ -773,7 +804,7 @@ describe('App', () => {
         legalHold: true,
         reason: 'Placed from workspace demo panel before retention enforcement.',
       }),
-      'session-token',
+      'cookie-session',
     );
     expect(text(container)).toContain('legal hold on');
     expect(text(container)).toContain('Release legal hold');
@@ -789,7 +820,7 @@ describe('App', () => {
         reviewer: 'finance-review@example.com',
         notes: 'Submitted from workspace panel for finance/legal artifact review.',
       }),
-      'session-token',
+      'cookie-session',
     );
     expect(text(container)).toContain('Review queue: pending');
     expect(text(container)).toContain('finance-review@example.com');
@@ -806,7 +837,7 @@ describe('App', () => {
         reviewer: 'finance-review@example.com',
         evidenceReference: 'review://invoice-artifacts/artifact-1/approved',
       }),
-      'session-token',
+      'cookie-session',
     );
     expect(text(container)).toContain('Review queue: approved');
     expect(text(container)).toContain('approved 1');
@@ -826,7 +857,7 @@ describe('App', () => {
         notes:
           'Queued for policy owner review with explicit expiry target and invoice-grade caveat.',
       }),
-      'session-token',
+      'cookie-session',
     );
     expect(text(container)).toContain('Policy exception: requested');
     expect(text(container)).toContain('risk-review@example.com');
@@ -845,7 +876,7 @@ describe('App', () => {
           'Approving a time-boxed exception for demo governance review; invoice-grade validation remains blocked.',
         evidenceReference: 'exception://invoice-artifacts/artifact-1/approved',
       }),
-      'session-token',
+      'cookie-session',
     );
     expect(text(container)).toContain('Policy exception: approved');
     expect(text(container)).toContain('approved 1');
@@ -856,7 +887,7 @@ describe('App', () => {
     expect(client.downloadInvoiceArtifactBlob).toHaveBeenCalledWith(
       '66666666-6666-4666-8666-666666666666',
       'artifact-1',
-      'session-token',
+      'cookie-session',
     );
     expect(window.URL.createObjectURL).toHaveBeenCalledWith(expect.any(Blob));
     expect(HTMLAnchorElement.prototype.click).toHaveBeenCalled();
@@ -873,7 +904,7 @@ describe('App', () => {
         controlTotalUsd: 107,
         sha256: 'd'.repeat(64),
       }),
-      'session-token',
+      'cookie-session',
     );
     expect(text(container)).toContain(
       'Artifact metadata: 1 registered · 1 verified · registered with verified artifacts',
@@ -889,7 +920,7 @@ describe('App', () => {
         acceptedVarianceUsd: 0.01,
         evidenceReference: 'invoice-control://invoice-artifacts/artifact-1',
       }),
-      'session-token',
+      'cookie-session',
     );
     expect(text(container)).toContain(
       'Invoice control: matched · reconciliation delta $0.00 · import delta $0.00 · period matched',
@@ -900,7 +931,7 @@ describe('App', () => {
 
     expect(client.exportInvoiceEvidencePacket).toHaveBeenCalledWith(
       '66666666-6666-4666-8666-666666666666',
-      'session-token',
+      'cookie-session',
     );
     expect(window.URL.createObjectURL).toHaveBeenLastCalledWith(expect.any(Blob));
     expect(text(container)).toContain(
@@ -937,14 +968,14 @@ describe('App', () => {
       displayName: 'Platform Owner',
       teamName: 'Coverage Team',
     });
-    expect(window.localStorage.getItem('polycost-auth-session-v1')).toBe('session-token');
+    expect(window.localStorage.getItem('polycost-auth-session-v1')).toBe('cookie-session');
     expect(text(container)).toContain('Workspace registered.');
 
     unmount();
   });
 
   it('shows the team admin empty state for member workspace sessions', async () => {
-    window.localStorage.setItem('polycost-auth-session-v1', 'session-token');
+    window.localStorage.setItem('polycost-auth-session-v1', 'cookie-session');
     const client = clientMock({
       getCurrentSession: jest.fn(async () => ({
         account: {
@@ -1002,7 +1033,7 @@ describe('App', () => {
   });
 
   it('surfaces admin RBAC limits in team controls before the API rejects them', async () => {
-    window.localStorage.setItem('polycost-auth-session-v1', 'session-token');
+    window.localStorage.setItem('polycost-auth-session-v1', 'cookie-session');
     const client = clientMock({
       getCurrentSession: jest.fn(async () => ({
         account: {
@@ -1067,7 +1098,7 @@ describe('App', () => {
     expect(client.removeTeamMember).toHaveBeenCalledWith(
       '22222222-2222-4222-8222-222222222222',
       '44444444-aaaa-4aaa-8aaa-444444444444',
-      'session-token',
+      'cookie-session',
     );
 
     unmount();
@@ -1097,7 +1128,7 @@ describe('App', () => {
   });
 
   it('imports provider billing exports without reconciliation before comparison runs', async () => {
-    window.localStorage.setItem('polycost-auth-session-v1', 'session-token');
+    window.localStorage.setItem('polycost-auth-session-v1', 'cookie-session');
     const client = clientMock();
     const { container, unmount } = render(<App client={client} />);
 
@@ -1112,7 +1143,7 @@ describe('App', () => {
         sourceType: 'gcp-billing-export',
         content: expect.stringContaining('Compute Engine'),
       }),
-      'session-token',
+      'cookie-session',
     );
     expect(client.reconcileBillingImport).not.toHaveBeenCalled();
     expect(text(container)).toContain('Run a comparison to attach estimate-vs-actual evidence');
@@ -4317,7 +4348,7 @@ function clientMock(overrides: Partial<PolyCostClient> = {}): PolyCostClient {
     getHealth: jest.fn(async () => backendHealth),
     getDataHealth: jest.fn(async () => dataHealth),
     register: jest.fn(async () => ({
-      token: 'session-token',
+      token: 'cookie-session',
       expiresAt: '2099-07-07T00:00:00.000Z',
       account: {
         id: '11111111-1111-4111-8111-111111111111',
@@ -4330,7 +4361,7 @@ function clientMock(overrides: Partial<PolyCostClient> = {}): PolyCostClient {
       },
     })),
     login: jest.fn(async () => ({
-      token: 'session-token',
+      token: 'cookie-session',
       expiresAt: '2099-07-07T00:00:00.000Z',
       account: {
         id: '11111111-1111-4111-8111-111111111111',

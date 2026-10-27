@@ -1224,8 +1224,30 @@ export function intervalCostMultiplier(interval: IntervalKey): number {
   return intervalMultiplierFromMonthly(interval);
 }
 
+/**
+ * The invite token from the landing URL. New links carry it in the fragment
+ * (`/#invite_token=…`), which browsers never send to a server, so it stays out
+ * of access logs (H-05); links sent before that use the query string.
+ */
 export function readInviteTokenFromUrl(): string {
-  return new URLSearchParams(window.location.search).get('invite_token')?.trim() ?? '';
+  const fromHash = new URLSearchParams(window.location.hash.replace(/^#/, '')).get('invite_token');
+  const fromQuery = new URLSearchParams(window.location.search).get('invite_token');
+  return (fromHash ?? fromQuery)?.trim() ?? '';
+}
+
+/** Once captured, take the token out of the address bar and history entry. */
+export function stripInviteTokenFromUrl(): void {
+  const url = new URL(window.location.href);
+  const hash = new URLSearchParams(url.hash.replace(/^#/, ''));
+  if (!url.searchParams.has('invite_token') && !hash.has('invite_token')) return;
+  url.searchParams.delete('invite_token');
+  hash.delete('invite_token');
+  const nextHash = hash.toString();
+  window.history.replaceState(
+    window.history.state,
+    '',
+    `${url.pathname}${url.search}${nextHash ? `#${nextHash}` : ''}`,
+  );
 }
 
 export function isPastIsoTimestamp(value: string): boolean {

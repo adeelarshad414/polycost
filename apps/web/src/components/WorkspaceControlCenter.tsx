@@ -44,6 +44,7 @@ import {
   providerExportSample,
   providerLabel,
   readInviteTokenFromUrl,
+  stripInviteTokenFromUrl,
   sourceTypeForProvider,
   teamAuditActionLabel,
   teamAuditEventDetail,
@@ -229,6 +230,9 @@ export function WorkspaceControlCenter({
       return undefined;
     }
 
+    // Held in state now; keep it out of the address bar, history and any
+    // screenshot or copied link from here on.
+    stripInviteTokenFromUrl();
     let isMounted = true;
 
     void client

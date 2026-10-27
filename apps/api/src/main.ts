@@ -60,6 +60,7 @@ async function bootstrap() {
     corsOriginsFromConfig(config.get('CORS_ALLOWED_ORIGINS', { infer: true })),
     app.get(MetricsService),
     logger,
+    { secureCookies: config.get('AUTH_COOKIE_SECURE', { infer: true }) },
   );
 
   await app.listen({ port: config.get('PORT', { infer: true }), host: '0.0.0.0' });
