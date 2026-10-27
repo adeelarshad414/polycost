@@ -8,6 +8,7 @@ import {
 import { writeKeyHeaders, writeKeys } from './lib/write-keys';
 import {
   ApiErrorDetail,
+  TeamDomainRecord,
   ResourceOwnership,
   TeamComparisonSummary,
   AccountSessionRecord,
@@ -160,6 +161,11 @@ export interface PolyCostClient {
   ): Promise<TeamInvitationRecord>;
   listTeamAuditEvents(teamId: string, token: string): Promise<TeamAuditEventRecord[]>;
   listTeamScimTokens(teamId: string, token: string): Promise<TeamScimTokenRecord[]>;
+  /** Audit H-01: email domains the team owns; SCIM provisions only verified ones. */
+  listTeamDomains(teamId: string, token: string): Promise<TeamDomainRecord[]>;
+  addTeamDomain(teamId: string, domain: string, token: string): Promise<TeamDomainRecord>;
+  verifyTeamDomain(teamId: string, domainId: string, token: string): Promise<TeamDomainRecord>;
+  removeTeamDomain(teamId: string, domainId: string, token: string): Promise<TeamDomainRecord>;
   listTeamScimUsers(teamId: string, token: string): Promise<TeamScimUserRecord[]>;
   createTeamScimToken(
     teamId: string,
@@ -532,6 +538,34 @@ export function createPolyCostClient(baseUrl = configuredApiBaseUrl()): PolyCost
         {
           headers: authorizationHeaders(token),
         },
+      );
+    },
+    listTeamDomains(teamId, token) {
+      return requestJson<TeamDomainRecord[]>(
+        baseUrl,
+        `/auth/teams/${encodeURIComponent(teamId)}/domains`,
+        { headers: authorizationHeaders(token) },
+      );
+    },
+    addTeamDomain(teamId, domain, token) {
+      return requestJson<TeamDomainRecord>(
+        baseUrl,
+        `/auth/teams/${encodeURIComponent(teamId)}/domains`,
+        { method: 'POST', headers: authorizationHeaders(token), body: JSON.stringify({ domain }) },
+      );
+    },
+    verifyTeamDomain(teamId, domainId, token) {
+      return requestJson<TeamDomainRecord>(
+        baseUrl,
+        `/auth/teams/${encodeURIComponent(teamId)}/domains/${encodeURIComponent(domainId)}/verify`,
+        { method: 'POST', headers: authorizationHeaders(token) },
+      );
+    },
+    removeTeamDomain(teamId, domainId, token) {
+      return requestJson<TeamDomainRecord>(
+        baseUrl,
+        `/auth/teams/${encodeURIComponent(teamId)}/domains/${encodeURIComponent(domainId)}`,
+        { method: 'DELETE', headers: authorizationHeaders(token) },
       );
     },
     createTeamScimToken(teamId, input, token) {

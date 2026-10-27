@@ -623,6 +623,7 @@ Invoice artifacts additionally carry `malware_scan_status`
 erDiagram
     ACCOUNTS ||--o{ TEAMS : owns
     TEAMS ||--o{ TEAM_AUDIT_EVENTS : records
+    TEAMS ||--o{ TEAM_DOMAINS : "proves ownership of (SCIM scope)"
     TEAM_AUDIT_EVENTS ||--o| TEAM_AUDIT_EVENT_EXPORTS : "outbox (cascade)"
     COMPARISONS ||--o{ COMPARISON_AUDIT_LOGS : "rate evidence"
     BILLING_IMPORT_RUNS ||--o{ INVOICE_LINE_ITEMS : contains

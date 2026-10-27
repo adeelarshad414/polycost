@@ -113,6 +113,16 @@ stamped when it is created:
 edit keys and claiming behave as described; and an E2E sweep that restarts the API
 with anonymous mode off and expects 401 from every core route.
 
+**SCIM (audit H-01).** A team's SCIM token can create or link only addresses on an
+email domain the team has proved it owns: a DNS TXT record at
+`_polycost-verification.<domain>`, checked on request, and one verified owner per
+domain (a partial unique index). This replaces the earlier containment rule
+(members and invitees only). Nobody can pre-claim a stranger's address or pull
+in another organisation's account, while an organisation can still bring in its own
+people who registered before SSO. Shared mailbox domains cannot be claimed.
+Deactivation never needs the domain. `DOMAIN_VERIFICATION_MODE=development-auto`
+skips DNS for local stacks and is refused in staging and production.
+
 **Known limits** (tracked, not hidden):
 
 - An anonymous link is a bearer capability: anyone it is forwarded to can read the

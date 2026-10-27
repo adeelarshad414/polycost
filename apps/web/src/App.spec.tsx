@@ -4641,6 +4641,10 @@ function clientMock(overrides: Partial<PolyCostClient> = {}): PolyCostClient {
     generateTerraform: jest.fn(async () => terraformBundle),
     getComparison: jest.fn(async () => comparisonResult),
     getComparisonOwnership: jest.fn(async () => anonymousOwnership),
+    listTeamDomains: jest.fn(async () => []),
+    addTeamDomain: jest.fn(),
+    verifyTeamDomain: jest.fn(),
+    removeTeamDomain: jest.fn(),
     getWorkloadOwnership: jest.fn(async () => anonymousOwnership),
     listTeamComparisons: jest.fn(async () => []),
     claimComparison: jest.fn(async (comparisonId: string) => ({

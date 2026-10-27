@@ -46,27 +46,28 @@ npm run demo:verify-clean
 
 Start from `.env.example`. The most important runtime variables are:
 
-| Area          | Variables                                                                                                      |
-| ------------- | -------------------------------------------------------------------------------------------------------------- |
-| API/web ports | `API_PORT`, `API_HOST_PORT`, `WEB_PORT`, `VITE_API_BASE_URL` (build arg)                                       |
-| Database      | `DB_HOST`, `DB_PORT`, `DB_NAME`                                                                                |
-| Redis         | `REDIS_HOST`, `REDIS_PORT`                                                                                     |
-| Vault         | `VAULT_ADDR`, `VAULT_TOKEN_FILE`, optional `VAULT_NAMESPACE`                                                   |
-| Pricing       | `USE_MOCK_PROVIDERS`, `PRICING_ETL_RUN_ON_BOOT`, `PRICING_ETL_PRUNE_MIN_FRESH_RATIO`, provider default regions |
-| Proxy         | `TRUST_PROXY_HOPS` (proxies in front of the API; default 1)                                                    |
-| DB pools/TLS  | `DB_POOL_MAX`, `DB_STATEMENT_TIMEOUT_MS`, `DB_ETL_STATEMENT_TIMEOUT_MS`, `DB_SSL_MODE`, `DB_SSL_CA`            |
-| Redis auth    | `REDIS_USERNAME`, `REDIS_PASSWORD` (secret), `REDIS_TLS`                                                       |
-| Workers       | `JOB_WORKERS_ENABLED` (false = HTTP only; a worker deployment runs jobs)                                       |
-| Tenancy       | `ANONYMOUS_MODE` (`enabled` default; `disabled` requires a session on core routes; Helm always sets it)        |
-| Sessions      | `AUTH_COOKIE_SECURE` (default `true`: the browser session cookie is HTTPS-only; `false` for plain-http dev)    |
-| Anon expiry   | `ANONYMOUS_RETENTION_DAYS` (30), `ANONYMOUS_RETENTION_GRACE_DAYS` (60, for rows that predate expiry)           |
-| Rate limits+  | `RATE_LIMIT_TERRAFORM_PER_MINUTE` (default 10)                                                                 |
-| Observability | `GRAFANA_PASSWORD` (required by the compose `observability` profile)                                           |
-| Jobs          | pricing, currency, alert, and share-link cleanup cron variables                                                |
-| Auth          | session TTL, registration, lockout, SSO, invite delivery mode/webhook                                          |
-| Audit export  | audit export mode, SIEM/WORM webhook URL, signing secret, retry schedule                                       |
-| Rate limits   | auth, parse, diagram, compare, export, share, live-refresh limits                                              |
-| LLM hooks     | natural-language and diagram classifier endpoint/model variables                                               |
+| Area          | Variables                                                                                                          |
+| ------------- | ------------------------------------------------------------------------------------------------------------------ |
+| API/web ports | `API_PORT`, `API_HOST_PORT`, `WEB_PORT`, `VITE_API_BASE_URL` (build arg)                                           |
+| Database      | `DB_HOST`, `DB_PORT`, `DB_NAME`                                                                                    |
+| Redis         | `REDIS_HOST`, `REDIS_PORT`                                                                                         |
+| Vault         | `VAULT_ADDR`, `VAULT_TOKEN_FILE`, optional `VAULT_NAMESPACE`                                                       |
+| Pricing       | `USE_MOCK_PROVIDERS`, `PRICING_ETL_RUN_ON_BOOT`, `PRICING_ETL_PRUNE_MIN_FRESH_RATIO`, provider default regions     |
+| Proxy         | `TRUST_PROXY_HOPS` (proxies in front of the API; default 1)                                                        |
+| DB pools/TLS  | `DB_POOL_MAX`, `DB_STATEMENT_TIMEOUT_MS`, `DB_ETL_STATEMENT_TIMEOUT_MS`, `DB_SSL_MODE`, `DB_SSL_CA`                |
+| Redis auth    | `REDIS_USERNAME`, `REDIS_PASSWORD` (secret), `REDIS_TLS`                                                           |
+| Workers       | `JOB_WORKERS_ENABLED` (false = HTTP only; a worker deployment runs jobs)                                           |
+| Tenancy       | `ANONYMOUS_MODE` (`enabled` default; `disabled` requires a session on core routes; Helm always sets it)            |
+| Sessions      | `AUTH_COOKIE_SECURE` (default `true`: the browser session cookie is HTTPS-only; `false` for plain-http dev)        |
+| SCIM domains  | `DOMAIN_VERIFICATION_MODE` (`dns` default and required in staging/production; `development-auto` for local stacks) |
+| Anon expiry   | `ANONYMOUS_RETENTION_DAYS` (30), `ANONYMOUS_RETENTION_GRACE_DAYS` (60, for rows that predate expiry)               |
+| Rate limits+  | `RATE_LIMIT_TERRAFORM_PER_MINUTE` (default 10)                                                                     |
+| Observability | `GRAFANA_PASSWORD` (required by the compose `observability` profile)                                               |
+| Jobs          | pricing, currency, alert, and share-link cleanup cron variables                                                    |
+| Auth          | session TTL, registration, lockout, SSO, invite delivery mode/webhook                                              |
+| Audit export  | audit export mode, SIEM/WORM webhook URL, signing secret, retry schedule                                           |
+| Rate limits   | auth, parse, diagram, compare, export, share, live-refresh limits                                                  |
+| LLM hooks     | natural-language and diagram classifier endpoint/model variables                                                   |
 
 `VITE_API_BASE_URL` is baked into the web image at build time. When it is an
 absolute URL (compose uses `http://localhost:3001/api/v1`), its origin is added

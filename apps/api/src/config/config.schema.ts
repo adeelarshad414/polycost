@@ -160,6 +160,10 @@ export const configSchema = z
     // H-05: the browser session cookie carries `Secure`, so it is only sent over
     // HTTPS. Turn off only for plain-http local development (compose does).
     AUTH_COOKIE_SECURE: envBoolean(true),
+    // Audit H-01: how a team proves it owns an email domain before SCIM may
+    // provision it. `dns` checks a TXT record; `development-auto` accepts any
+    // domain at once, for local and CI stacks only (refused in staging/production).
+    DOMAIN_VERIFICATION_MODE: z.enum(['dns', 'development-auto']).default('dns'),
     AUTH_PASSWORD_MIN_LENGTH: z.coerce.number().int().min(8).default(12),
     AUTH_MAX_FAILED_LOGIN_ATTEMPTS: z.coerce.number().int().min(3).default(5),
     AUTH_LOCKOUT_MINUTES: z.coerce.number().int().positive().default(15),
@@ -268,6 +272,14 @@ export const configSchema = z
     }
 
     if (config.NODE_ENV === 'production' || config.NODE_ENV === 'staging') {
+      if (config.DOMAIN_VERIFICATION_MODE !== 'dns') {
+        context.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ['DOMAIN_VERIFICATION_MODE'],
+          message: 'Staging and production must verify domain ownership through DNS.',
+        });
+      }
+
       if (config.AUTH_INVITE_DELIVERY_MODE !== 'webhook') {
         context.addIssue({
           code: z.ZodIssueCode.custom,

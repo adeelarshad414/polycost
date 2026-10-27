@@ -183,6 +183,8 @@ services:
       ANONYMOUS_MODE: ${ANONYMOUS_MODE:-enabled}
       # Plain-http localhost: a Secure cookie would never be sent back.
       AUTH_COOKIE_SECURE: ${AUTH_COOKIE_SECURE:-false}
+      # Local stack only: claimed domains verify at once. Production checks DNS.
+      DOMAIN_VERIFICATION_MODE: ${DOMAIN_VERIFICATION_MODE:-development-auto}
       ANONYMOUS_RETENTION_DAYS: ${ANONYMOUS_RETENTION_DAYS:-30}
       ANONYMOUS_RETENTION_GRACE_DAYS: ${ANONYMOUS_RETENTION_GRACE_DAYS:-60}
       FEATURE_RESERVED_PRICING: ${FEATURE_RESERVED_PRICING:-true}

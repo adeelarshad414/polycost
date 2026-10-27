@@ -3197,13 +3197,14 @@ describe('ApiDatabaseRepository', () => {
       status: 'active',
     };
 
-    function scimQuery(eligible: boolean) {
+    // Target state: SCIM acts only on email domains the team has verified.
+    function scimQuery(owned: boolean) {
       return jest.fn<QueryMock>(async (text: string) => {
         if (text.includes('FROM accounts') && text.includes('lower(email) = lower($1)')) {
           return { rows: [existingAccount], rowCount: 1 };
         }
-        if (text.includes('AS eligible')) {
-          return { rows: [{ eligible }], rowCount: 1 };
+        if (text.includes('AS owned')) {
+          return { rows: [{ owned }], rowCount: 1 };
         }
         if (text.includes('UPDATE accounts')) {
           return {
@@ -3234,20 +3235,24 @@ describe('ApiDatabaseRepository', () => {
       });
     }
 
-    it('refuses an account that is not in the team, without touching it', async () => {
+    it('refuses an address on a domain the team has not verified, touching nothing', async () => {
       const query = scimQuery(false);
       const repository = createRepository(query);
 
       await expect(repository.upsertTeamScimUser(scimInput)).rejects.toThrow(
-        /existing PolyCost account outside this team/,
+        'Verify other-tenant.example for this team before provisioning its users with SCIM.',
       );
       const sql = query.mock.calls.map(([text]) => String(text));
       expect(sql.some((text) => text.includes('UPDATE accounts'))).toBe(false);
+      expect(sql.some((text) => text.includes('INSERT INTO accounts'))).toBe(false);
       expect(sql.some((text) => text.includes('INSERT INTO team_memberships'))).toBe(false);
       expect(sql).toContain('ROLLBACK');
+      const ownership = query.mock.calls.find(([text]) => String(text).includes('AS owned'));
+      expect(String(ownership?.[0])).toContain("status = 'verified'");
+      expect(ownership?.[1]).toEqual([scimInput.teamId, scimInput.userName]);
     });
 
-    it('links an account that is a member, invitee or already linked to the team', async () => {
+    it('links an existing account on a domain the team owns', async () => {
       const query = scimQuery(true);
       const repository = createRepository(query);
 
@@ -3257,6 +3262,16 @@ describe('ApiDatabaseRepository', () => {
       expect(
         query.mock.calls.some(([text]) => String(text).includes('INSERT INTO team_memberships')),
       ).toBe(true);
+    });
+
+    it('deactivates without needing the domain: removing access is always allowed', async () => {
+      const query = scimQuery(false);
+      const repository = createRepository(query);
+
+      await expect(
+        repository.upsertTeamScimUser({ ...scimInput, active: false }),
+      ).resolves.toBeDefined();
+      expect(query.mock.calls.some(([text]) => String(text).includes('AS owned'))).toBe(false);
     });
   });
 

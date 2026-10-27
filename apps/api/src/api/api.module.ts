@@ -64,6 +64,8 @@ import { RegionsController } from './regions.controller.js';
 import { RegionsService } from './regions.service.js';
 import { ReportExportJobsService } from './report-export-jobs.service.js';
 import { ScimProvisioningController } from './scim-provisioning.controller.js';
+import { TeamDomainsController } from './team-domains.controller.js';
+import { TeamDomainsService } from './team-domains.service.js';
 import { ScimProvisioningService } from './scim-provisioning.service.js';
 import { SessionAuthGuard } from './session-auth.guard.js';
 import { TeamAuditExportService } from './team-audit-export.service.js';
@@ -93,6 +95,7 @@ import { WorkloadController } from './workload.controller.js';
     ExchangeRatesController,
     AuthController,
     ScimProvisioningController,
+    TeamDomainsController,
     BillingController,
     TerraformGenerationController,
   ],
@@ -147,6 +150,7 @@ import { WorkloadController } from './workload.controller.js';
     AuthService,
     ResourceAccessService,
     ScimProvisioningService,
+    TeamDomainsService,
     SessionAuthGuard,
     BillingService,
     ComparisonAnalyticsService,

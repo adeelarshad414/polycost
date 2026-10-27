@@ -437,6 +437,9 @@ export type TeamAuditAction =
   | 'team.scim_token.revoked'
   | 'team.scim.user_upserted'
   | 'team.scim.user_deactivated'
+  | 'team.domain.added'
+  | 'team.domain.verified'
+  | 'team.domain.removed'
   | 'billing.import.created'
   | 'billing.reconciliation.created'
   | 'billing.reconciliation.artifact_registered'
@@ -1873,4 +1876,16 @@ export interface TeamComparisonSummary {
   cheapestProviderId: string | null;
   cheapestMonthlyUsd: number | null;
   providerCount: number;
+}
+
+/** An email domain the team claims; SCIM provisions only verified ones (audit H-01). */
+export interface TeamDomainRecord {
+  id: string;
+  teamId: string;
+  domain: string;
+  status: 'pending' | 'verified';
+  verificationRecord: { type: 'TXT'; name: string; value: string };
+  createdAt: string;
+  lastCheckedAt?: string;
+  verifiedAt?: string;
 }

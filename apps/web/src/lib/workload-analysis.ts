@@ -107,6 +107,12 @@ export function teamAuditActionLabel(action: TeamAuditEventRecord['action']): st
       return 'SCIM user provisioned';
     case 'team.scim.user_deactivated':
       return 'SCIM user deactivated';
+    case 'team.domain.added':
+      return 'Domain added';
+    case 'team.domain.verified':
+      return 'Domain verified';
+    case 'team.domain.removed':
+      return 'Domain removed';
     case 'billing.import.created':
       return 'Billing import created';
     case 'billing.reconciliation.created':

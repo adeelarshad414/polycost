@@ -19,6 +19,11 @@ Implemented:
 - Active SCIM users attach to the PolyCost team as `member`; deactivation removes
   that team membership without globally disabling unrelated accounts.
 - Team audit events for SCIM token and user lifecycle changes.
+- **Verified email domains (audit H-01).** SCIM creates or links only addresses on a
+  domain the team has verified with a DNS TXT record. One team at a time can hold a
+  domain verified. An identity provider therefore cannot create accounts for another
+  organisation's addresses, or take over an account that belongs to one.
+  Deactivating a user never needs the domain.
 
 Not yet claimed:
 
@@ -63,6 +68,33 @@ Authorization: Bearer pc_scim_...
 
 The raw bearer is displayed once when created by a team owner/admin. Store it in
 the IdP secret field only. PolyCost does not persist or show it again.
+
+## Verify Your Email Domain
+
+Do this first: until the domain is verified, every SCIM create, replace or
+reactivate for it is refused with `403 Verify <domain> for this team …`.
+
+1. Sign in as a team owner or admin and open the workspace Team panel.
+2. Under **Verified domains**, add the domain your IdP manages, for example
+   `acme.com`. Shared mailbox domains such as `gmail.com` are refused.
+3. Publish the TXT record shown, for example:
+
+   ```text
+   _polycost-verification.acme.com  TXT  "polycost-verification=3f9c…"
+   ```
+
+4. Press **Verify acme.com**. PolyCost looks the record up in DNS; if it is not
+   visible yet, wait for DNS propagation and try again.
+5. Add each further domain your users have (subsidiaries, regional domains).
+
+The same flow is available over the API:
+`POST /api/v1/auth/teams/:teamId/domains` with `{ "domain": "acme.com" }`, then
+`POST /api/v1/auth/teams/:teamId/domains/:domainId/verify`. Removing a domain
+(`DELETE …/domains/:domainId`) stops SCIM provisioning on it at once; users already
+provisioned keep their accounts until the IdP deactivates them.
+
+Local and CI stacks run `DOMAIN_VERIFICATION_MODE=development-auto`, which verifies
+claimed domains without DNS. Staging and production refuse to boot with it.
 
 ## Create A SCIM Token
 
@@ -216,6 +248,7 @@ the bundle.
 
 ## Security Checklist
 
+- Verify only domains your organisation controls, and remove domains you give up.
 - Use a dedicated token per IdP environment.
 - Prefer expiring tokens for pilots and rotate before expiry.
 - Revoke unused tokens after test runs.

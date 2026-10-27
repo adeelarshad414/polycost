@@ -11,6 +11,7 @@ import { SecretsService } from '../secrets/secrets.service.js';
 import type { SecretsReader } from '../secrets/secrets.service.js';
 import {
   ApiConflictError,
+  ApiForbiddenError,
   ApiNotFoundError,
   ApiValidationError,
   DataHealthResponse,
@@ -704,6 +705,21 @@ export interface TeamComparisonSummary {
   cheapestMonthlyUsd: number | null;
   providerCount: number;
 }
+
+/** A row of team_domains (audit H-01). */
+export interface TeamDomainRow {
+  id: string;
+  team_id: string;
+  domain: string;
+  verification_token: string;
+  status: 'pending' | 'verified';
+  created_at: Date;
+  last_checked_at: Date | null;
+  verified_at: Date | null;
+}
+
+const TEAM_DOMAIN_COLUMNS =
+  'id, team_id, domain, verification_token, status, created_at, last_checked_at, verified_at';
 
 const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
@@ -3928,6 +3944,132 @@ export class ApiDatabaseRepository implements OnModuleDestroy {
     });
   }
 
+  // --- Audit H-01: team email-domain ownership -------------------------------
+
+  async listTeamDomains(teamId: string): Promise<TeamDomainRow[]> {
+    const result = await (
+      await this.getPool()
+    ).query<TeamDomainRow>(
+      `SELECT ${TEAM_DOMAIN_COLUMNS} FROM team_domains WHERE team_id = $1 ORDER BY domain`,
+      [teamId],
+    );
+    return result.rows;
+  }
+
+  async getTeamDomain(teamId: string, domainId: string): Promise<TeamDomainRow | undefined> {
+    if (!UUID_PATTERN.test(domainId)) return undefined;
+    const result = await (
+      await this.getPool()
+    ).query<TeamDomainRow>(
+      `SELECT ${TEAM_DOMAIN_COLUMNS} FROM team_domains WHERE team_id = $1 AND id = $2`,
+      [teamId, domainId],
+    );
+    return result.rows[0];
+  }
+
+  /** Undefined when the team already has this domain. */
+  async createTeamDomain(input: {
+    teamId: string;
+    domain: string;
+    verificationToken: string;
+    createdByAccountId: string;
+  }): Promise<TeamDomainRow | undefined> {
+    return this.withTransaction(async (pool) => {
+      const result = await pool.query<TeamDomainRow>(
+        `INSERT INTO team_domains (team_id, domain, verification_token, created_by_account_id)
+         VALUES ($1, $2, $3, $4)
+         ON CONFLICT (team_id, domain) DO NOTHING
+         RETURNING ${TEAM_DOMAIN_COLUMNS}`,
+        [input.teamId, input.domain, input.verificationToken, input.createdByAccountId],
+      );
+      const row = result.rows[0];
+      if (row) {
+        await this.insertTeamAuditEvent(pool, {
+          teamId: input.teamId,
+          actorAccountId: input.createdByAccountId,
+          action: 'team.domain.added',
+          targetType: 'domain',
+          targetId: row.id,
+          metadata: { domain: row.domain },
+        });
+      }
+      return row;
+    });
+  }
+
+  async recordTeamDomainCheck(teamId: string, domainId: string): Promise<void> {
+    await (
+      await this.getPool()
+    ).query(`UPDATE team_domains SET last_checked_at = now() WHERE team_id = $1 AND id = $2`, [
+      teamId,
+      domainId,
+    ]);
+  }
+
+  /**
+   * 'taken' when another team already holds the domain verified: the partial
+   * unique index refuses a second verified owner.
+   */
+  async markTeamDomainVerified(input: {
+    teamId: string;
+    domainId: string;
+    actorAccountId: string;
+  }): Promise<TeamDomainRow | 'taken' | undefined> {
+    try {
+      return await this.withTransaction(async (pool) => {
+        const result = await pool.query<TeamDomainRow>(
+          `UPDATE team_domains
+           SET status = 'verified', verified_at = now(), last_checked_at = now()
+           WHERE team_id = $1 AND id = $2
+           RETURNING ${TEAM_DOMAIN_COLUMNS}`,
+          [input.teamId, input.domainId],
+        );
+        const row = result.rows[0];
+        if (row) {
+          await this.insertTeamAuditEvent(pool, {
+            teamId: input.teamId,
+            actorAccountId: input.actorAccountId,
+            action: 'team.domain.verified',
+            targetType: 'domain',
+            targetId: row.id,
+            metadata: { domain: row.domain },
+          });
+        }
+        return row;
+      });
+    } catch (error) {
+      if ((error as { code?: string }).code === '23505') {
+        return 'taken';
+      }
+      throw error;
+    }
+  }
+
+  async deleteTeamDomain(input: {
+    teamId: string;
+    domainId: string;
+    actorAccountId: string;
+  }): Promise<TeamDomainRow | undefined> {
+    return this.withTransaction(async (pool) => {
+      const result = await pool.query<TeamDomainRow>(
+        `DELETE FROM team_domains WHERE team_id = $1 AND id = $2 RETURNING ${TEAM_DOMAIN_COLUMNS}`,
+        [input.teamId, input.domainId],
+      );
+      const row = result.rows[0];
+      if (row) {
+        await this.insertTeamAuditEvent(pool, {
+          teamId: input.teamId,
+          actorAccountId: input.actorAccountId,
+          action: 'team.domain.removed',
+          targetType: 'domain',
+          targetId: row.id,
+          metadata: { domain: row.domain, wasVerified: row.status === 'verified' },
+        });
+      }
+      return row;
+    });
+  }
+
   async listTeamScimTokens(teamId: string): Promise<TeamScimTokenRecord[]> {
     const result = await (
       await this.getPool()
@@ -4123,38 +4265,29 @@ export class ApiDatabaseRepository implements OnModuleDestroy {
         return undefined;
       }
 
-      // Audit H-01: a team's SCIM token may only provision accounts that belong
-      // to that team - existing members, people with a pending invite to it, or
-      // identities this team's SCIM already linked. Matching on email alone let
-      // any team admin pull another tenant's account into their team and rewrite
-      // its global display name. New accounts are still created normally.
-      if (account) {
-        const eligible = await pool.query<{ eligible: boolean }>(
+      // Audit H-01: SCIM may only create or link accounts on an email domain
+      // this team has proved it owns (a verified DNS TXT record, migration
+      // 046). Domain ownership is the authority an identity provider has over
+      // its users, so an existing account on that domain may be linked; any
+      // other address - another company's, a consumer mailbox, an unverified
+      // domain - is refused, so nobody can pre-claim or pull in a stranger.
+      // Deactivating is always allowed: removing access needs no ownership.
+      if (input.active) {
+        const owned = await pool.query<{ owned: boolean }>(
           `
-            SELECT (
-              EXISTS (
-                SELECT 1 FROM team_memberships
-                WHERE team_id = $1 AND account_id = $2
-              )
-              OR EXISTS (
-                SELECT 1 FROM team_scim_external_users
-                WHERE team_id = $1 AND account_id = $2
-              )
-              OR EXISTS (
-                SELECT 1 FROM team_invitations
-                WHERE team_id = $1
-                  AND lower(email) = lower($3)
-                  AND status = 'pending'
-                  AND expires_at > now()
-              )
-            ) AS eligible
+            SELECT EXISTS (
+              SELECT 1 FROM team_domains
+              WHERE team_id = $1
+                AND status = 'verified'
+                AND domain = lower(split_part($2, '@', 2))
+            ) AS owned
           `,
-          [input.teamId, account.id, input.userName],
+          [input.teamId, input.userName],
         );
 
-        if (!eligible.rows[0]?.eligible) {
-          throw new ApiConflictError(
-            'This email belongs to an existing PolyCost account outside this team. Invite it to the team first, then provision it with SCIM.',
+        if (!owned.rows[0]?.owned) {
+          throw new ApiForbiddenError(
+            `Verify ${input.userName.split('@')[1] ?? 'this domain'} for this team before provisioning its users with SCIM.`,
           );
         }
       }

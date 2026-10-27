@@ -585,6 +585,9 @@ async function verifyScimProvisioningJourney() {
   const suffix = randomUUID().slice(0, 8);
   const password = `ScimVerifyPassw0rd!-${suffix}`;
   const ownerEmail = `scim-owner-${suffix}@example.com`;
+  // Audit H-01: SCIM provisions only domains the team has verified, and a
+  // domain has one verified owner, so every run uses its own subdomain.
+  const scimDomain = `scim-${suffix}.example.com`;
   const teamName = `SCIM Live Verify ${suffix}`;
 
   const owner = await apiJson('/api/v1/auth/register', {
@@ -689,13 +692,53 @@ async function verifyScimProvisioningJourney() {
   }
   markStep('loaded SCIM resource types');
 
+  const unverifiedAttempt = await apiJson('/api/v1/scim/v2/Users', {
+    method: 'POST',
+    token: tokenRecord.token,
+    body: {
+      schemas: ['urn:ietf:params:scim:schemas:core:2.0:User'],
+      externalId: `live-unverified-${suffix}`,
+      userName: `before-verify-${suffix}@${scimDomain}`,
+      active: true,
+    },
+    expectedStatus: 403,
+    label: 'SCIM provisioning before domain verification',
+  });
+  if (!String(unverifiedAttempt?.error?.message ?? '').includes(`Verify ${scimDomain}`)) {
+    throw new Error(
+      `Unverified SCIM provisioning was not refused: ${redactedJson(unverifiedAttempt)}`,
+    );
+  }
+  markStep('refused SCIM provisioning on an unverified domain');
+
+  const domainRecord = await apiJson(`/api/v1/auth/teams/${teamId}/domains`, {
+    method: 'POST',
+    token: owner.token,
+    body: { domain: scimDomain },
+    label: 'domain claim',
+  });
+  if (domainRecord?.status !== 'pending' || domainRecord.verificationRecord?.type !== 'TXT') {
+    throw new Error(`Domain claim returned unexpected payload: ${redactedJson(domainRecord)}`);
+  }
+  // The Compose stack runs DOMAIN_VERIFICATION_MODE=development-auto; production checks DNS.
+  const verifiedDomain = await apiJson(
+    `/api/v1/auth/teams/${teamId}/domains/${domainRecord.id}/verify`,
+    { method: 'POST', token: owner.token, label: 'domain verification' },
+  );
+  if (verifiedDomain?.status !== 'verified') {
+    throw new Error(
+      `Domain verification returned unexpected payload: ${redactedJson(verifiedDomain)}`,
+    );
+  }
+  markStep('verified the SCIM domain for the team');
+
   const scimUser = await apiJson('/api/v1/scim/v2/Users', {
     method: 'POST',
     token: tokenRecord.token,
     body: {
       schemas: ['urn:ietf:params:scim:schemas:core:2.0:User'],
       externalId: `live-scim-user-${suffix}`,
-      userName: `scim-user-${suffix}@example.com`,
+      userName: `scim-user-${suffix}@${scimDomain}`,
       name: {
         formatted: 'SCIM Live Verify User',
       },
@@ -707,7 +750,7 @@ async function verifyScimProvisioningJourney() {
   if (
     !scimUser?.id ||
     scimUser.active !== true ||
-    scimUser.userName !== `scim-user-${suffix}@example.com`
+    scimUser.userName !== `scim-user-${suffix}@${scimDomain}`
   ) {
     throw new Error(`SCIM user create returned unexpected payload: ${redactedJson(scimUser)}`);
   }
