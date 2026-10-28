@@ -126,6 +126,22 @@ describe('WorkspaceOverview', () => {
     }
   });
 
+  // Audit M-04: a $0 estimate has no variance percentage.
+  it('shows no variance percentage when there was no estimate', () => {
+    render(
+      <WorkspaceOverview
+        session={session}
+        members={members}
+        invitations={[]}
+        auditEvents={[]}
+        reconciliation={{ ...reconciliation('unmatched', 50), variancePercent: null }}
+        onNavigate={jest.fn()}
+      />,
+    );
+    expect(screen.getByText('Could not be matched')).toBeTruthy();
+    expect(screen.queryByText(/%$/)).toBeNull();
+  });
+
   it('humanises audit actions', () => {
     expect(humanizeAction('invoice-artifact.legal_hold')).toBe('Invoice artifact legal hold');
   });

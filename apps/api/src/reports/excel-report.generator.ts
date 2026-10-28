@@ -1,3 +1,4 @@
+import { roundUsd as roundCurrency } from '../money.js';
 import { Injectable } from '@nestjs/common';
 import { ComparisonResult } from '../comparison/comparison.types.js';
 import {
@@ -1172,8 +1173,4 @@ function xmlDocument(body: string): string {
 
 function xmlBuffer(value: string): Buffer {
   return Buffer.from(value, 'utf8');
-}
-
-function roundCurrency(value: number): number {
-  return Math.round((value + Number.EPSILON) * 100) / 100;
 }

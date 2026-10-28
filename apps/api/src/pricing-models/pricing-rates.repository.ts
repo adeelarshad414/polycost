@@ -1,3 +1,4 @@
+import { roundRateUsd } from '../money.js';
 import { Inject, Injectable, Logger, OnModuleDestroy, Optional } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { Pool } from 'pg';
@@ -398,5 +399,5 @@ function paymentAdjustedFactor(
 }
 
 function roundRate(value: number): number {
-  return Math.round((value + Number.EPSILON) * 1_000_000) / 1_000_000;
+  return roundRateUsd(value);
 }

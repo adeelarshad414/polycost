@@ -1,4 +1,5 @@
 import { CostIntervals } from './comparison/comparison.types.js';
+import { roundRateUsd, roundUsd as roundCurrency } from './money.js';
 // The `with { type: 'json' }` attribute is required by Node ESM; without it the
 // process refuses to load the module at all (ERR_IMPORT_ASSERTION_TYPE_MISSING).
 import monthlyHourStandard from '@polycost/types/monthly-hour-standard.json' with { type: 'json' };
@@ -18,7 +19,7 @@ export function intervalCostsFromHourly(hourlyCostUsd: number): CostIntervals {
   return {
     // Hourly is a sub-cent rate; round it finer so hourly x 730 reconciles with
     // the monthly total. Longer intervals are dollar totals rounded to cents.
-    hourly: roundRate(hourlyCostUsd),
+    hourly: roundRateUsd(hourlyCostUsd),
     daily: roundCurrency(hourlyCostUsd * HOURS_PER_DAY),
     weekly: roundCurrency(hourlyCostUsd * HOURS_PER_WEEK),
     monthly: roundCurrency(hourlyCostUsd * HOURS_PER_MONTH),
@@ -35,14 +36,5 @@ export function hourlyFromMonthly(monthlyCostUsd: number): number {
   return monthlyCostUsd / HOURS_PER_MONTH;
 }
 
-export function roundCurrency(value: number): number {
-  return Math.round((value + Number.EPSILON) * 100) / 100;
-}
-
-/**
- * Rounds an hourly RATE to 6 decimals. Hourly rates are frequently sub-cent, so
- * rounding to whole cents makes hourly x 730 disagree with the monthly total.
- */
-export function roundRate(value: number): number {
-  return Math.round((value + Number.EPSILON) * 1_000_000) / 1_000_000;
-}
+// Audit M-04: the names the engine already uses, now backed by money.ts.
+export { roundUsd as roundCurrency, roundRateUsd as roundRate } from './money.js';

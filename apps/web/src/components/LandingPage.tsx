@@ -1,3 +1,4 @@
+import { roundUsd as roundCurrency } from '../lib/money';
 import { useState } from 'react';
 import { POLYCOST_HERO_SUBHEAD, POLYCOST_TAGLINE } from '../brand';
 import { ResolvedTheme, ThemeChoice } from '../theme';
@@ -291,10 +292,6 @@ function formatCurrency(value: number): string {
     currency: 'USD',
     maximumFractionDigits: 0,
   }).format(value);
-}
-
-function roundCurrency(value: number): number {
-  return Math.round((value + Number.EPSILON) * 100) / 100;
 }
 
 function MenuIcon() {

@@ -1,3 +1,4 @@
+import { roundUsd as roundCurrency } from '../money.js';
 import { Injectable, Logger } from '@nestjs/common';
 import { ProviderId } from '../adapters/common/cloud-provider-adapter.js';
 import { ApiDatabaseRepository } from '../api/api-database.repository.js';
@@ -238,8 +239,4 @@ function selectModeledSpend(
 
 function formatUsd(value: number): string {
   return `$${roundCurrency(value).toFixed(2)}`;
-}
-
-function roundCurrency(value: number): number {
-  return Math.round((value + Number.EPSILON) * 100) / 100;
 }

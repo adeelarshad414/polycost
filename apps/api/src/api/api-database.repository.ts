@@ -1,3 +1,4 @@
+import { addUsd, roundUsd } from '../money.js';
 import { Inject, Injectable, OnModuleDestroy } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { Pool } from 'pg';
@@ -534,7 +535,7 @@ interface InvoiceReconciliationRow {
   estimated_total_usd: string;
   invoiced_total_usd: string;
   variance_usd: string;
-  variance_percent: string;
+  variance_percent: string | null;
   status: InvoiceReconciliationStatus;
   evidence: Record<string, unknown>;
   evidence_hash: string;
@@ -4685,7 +4686,7 @@ export class ApiDatabaseRepository implements OnModuleDestroy {
       }
 
       const acceptedRows = importedLineItems.length;
-      const totalCostUsd = importedLineItems.reduce((total, row) => total + row.costUsd, 0);
+      const totalCostUsd = importedLineItems.reduce((total, row) => addUsd(total, row.costUsd), 0);
       const finalImport = await pool.query<BillingImportRow>(
         `
           UPDATE billing_import_runs
@@ -4814,7 +4815,7 @@ export class ApiDatabaseRepository implements OnModuleDestroy {
     estimatedTotalUsd: number;
     invoicedTotalUsd: number;
     varianceUsd: number;
-    variancePercent: number;
+    variancePercent: number | null;
     status: InvoiceReconciliationStatus;
     evidence: Record<string, unknown>;
     audit?: TeamAuditEventInput;
@@ -4871,7 +4872,8 @@ export class ApiDatabaseRepository implements OnModuleDestroy {
             provider: row.provider,
             status: row.status,
             varianceUsd: Number.parseFloat(row.variance_usd),
-            variancePercent: Number.parseFloat(row.variance_percent),
+            variancePercent:
+              row.variance_percent === null ? null : Number.parseFloat(row.variance_percent),
             ...(input.audit.metadata ?? {}),
           },
         });
@@ -4986,7 +4988,8 @@ export class ApiDatabaseRepository implements OnModuleDestroy {
             provider: row.provider,
             status: row.status,
             varianceUsd: Number.parseFloat(row.variance_usd),
-            variancePercent: Number.parseFloat(row.variance_percent),
+            variancePercent:
+              row.variance_percent === null ? null : Number.parseFloat(row.variance_percent),
             ...(input.audit.metadata ?? {}),
           },
         });
@@ -5172,7 +5175,8 @@ export class ApiDatabaseRepository implements OnModuleDestroy {
             provider: row.provider,
             status: row.status,
             varianceUsd: Number.parseFloat(row.variance_usd),
-            variancePercent: Number.parseFloat(row.variance_percent),
+            variancePercent:
+              row.variance_percent === null ? null : Number.parseFloat(row.variance_percent),
             ...(input.audit.metadata ?? {}),
           },
         });
@@ -5249,7 +5253,8 @@ export class ApiDatabaseRepository implements OnModuleDestroy {
             provider: row.provider,
             status: row.status,
             varianceUsd: Number.parseFloat(row.variance_usd),
-            variancePercent: Number.parseFloat(row.variance_percent),
+            variancePercent:
+              row.variance_percent === null ? null : Number.parseFloat(row.variance_percent),
             ...(input.audit.metadata ?? {}),
           },
         });
@@ -5353,7 +5358,8 @@ export class ApiDatabaseRepository implements OnModuleDestroy {
             provider: row.provider,
             status: row.status,
             varianceUsd: Number.parseFloat(row.variance_usd),
-            variancePercent: Number.parseFloat(row.variance_percent),
+            variancePercent:
+              row.variance_percent === null ? null : Number.parseFloat(row.variance_percent),
             ...(input.audit.metadata ?? {}),
           },
         });
@@ -5802,7 +5808,7 @@ export class ApiDatabaseRepository implements OnModuleDestroy {
   }
 
   private roundCurrency(value: number): number {
-    return Math.round((value + Number.EPSILON) * 100) / 100;
+    return roundUsd(value);
   }
 }
 
@@ -6173,7 +6179,7 @@ function toInvoiceReconciliationRecord(row: InvoiceReconciliationRow): InvoiceRe
     estimatedTotalUsd: Number.parseFloat(row.estimated_total_usd),
     invoicedTotalUsd: Number.parseFloat(row.invoiced_total_usd),
     varianceUsd: Number.parseFloat(row.variance_usd),
-    variancePercent: Number.parseFloat(row.variance_percent),
+    variancePercent: row.variance_percent === null ? null : Number.parseFloat(row.variance_percent),
     status: row.status,
     evidence: row.evidence,
     evidenceHash: row.evidence_hash,

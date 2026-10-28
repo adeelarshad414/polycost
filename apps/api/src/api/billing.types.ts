@@ -582,7 +582,8 @@ export interface InvoiceReconciliationRecord {
   estimatedTotalUsd: number;
   invoicedTotalUsd: number;
   varianceUsd: number;
-  variancePercent: number;
+  /** Null when there was no estimate to compare against (audit M-04). */
+  variancePercent: number | null;
   status: InvoiceReconciliationStatus;
   evidence: Record<string, unknown>;
   // DB-computed md5 of the evidence JSON at read time, used as an optimistic

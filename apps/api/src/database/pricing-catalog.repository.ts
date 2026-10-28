@@ -1,3 +1,4 @@
+import { roundRateUsd } from '../money.js';
 import { Injectable, Logger, OnModuleDestroy } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { Pool } from 'pg';
@@ -919,5 +920,5 @@ function pricingRate(
 }
 
 function roundSix(value: number): number {
-  return Math.round(value * 1_000_000) / 1_000_000;
+  return roundRateUsd(value);
 }

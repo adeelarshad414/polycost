@@ -1,3 +1,4 @@
+import { addUsd, roundUsd } from '../money.js';
 import { Injectable } from '@nestjs/common';
 import { ComparisonLineItem, ComparisonResult } from '../comparison/comparison.types.js';
 import {
@@ -587,7 +588,7 @@ function serviceMixSlices(lineItems: ComparisonLineItem[]): ServiceMixSlice[] {
   const database = totalForCategory(lineItems, 'database');
   const network = totalForCategory(lineItems, 'network');
   const known = compute + storage + database + network;
-  const all = lineItems.reduce((sum, lineItem) => sum + lineItem.baseMonthlyCostUsd, 0);
+  const all = lineItems.reduce((sum, lineItem) => addUsd(sum, lineItem.baseMonthlyCostUsd), 0);
   const other = Math.max(0, all - known);
 
   return [
@@ -602,7 +603,7 @@ function serviceMixSlices(lineItems: ComparisonLineItem[]): ServiceMixSlice[] {
 function totalForCategory(lineItems: ComparisonLineItem[], category: string): number {
   return lineItems
     .filter((lineItem) => lineItem.category === category)
-    .reduce((sum, lineItem) => sum + lineItem.baseMonthlyCostUsd, 0);
+    .reduce((sum, lineItem) => addUsd(sum, lineItem.baseMonthlyCostUsd), 0);
 }
 
 // Colours come from report-brand.ts so a provider looks the same here, in the
@@ -719,7 +720,7 @@ function formatPdfNumber(value: number): string {
 }
 
 function formatCurrency(value: number): string {
-  return (Math.round((value + Number.EPSILON) * 100) / 100).toString();
+  return roundUsd(value).toString();
 }
 
 export function wrapLine(line: PdfLine): PdfLine[] {

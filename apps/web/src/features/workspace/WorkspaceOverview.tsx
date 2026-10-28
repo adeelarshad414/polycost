@@ -106,7 +106,8 @@ export function WorkspaceOverview({
         <KpiTile
           label="Variance"
           value={
-            reconciliation
+            // Audit M-04: no percentage against a $0 estimate.
+            reconciliation && reconciliation.variancePercent !== null
               ? `${reconciliation.varianceUsd >= 0 ? '+' : '−'}${formatPercent(
                   Math.abs(reconciliation.variancePercent),
                 )}`

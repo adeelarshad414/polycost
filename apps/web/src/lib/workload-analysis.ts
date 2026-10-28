@@ -1445,9 +1445,8 @@ export function reportFormatLabel(format: ReportFormat): string {
   return format === 'xlsx' ? 'Excel' : format.toUpperCase();
 }
 
-export function roundCurrency(value: number): number {
-  return Math.round((value + Number.EPSILON) * 100) / 100;
-}
+// Audit M-04: one rounding rule for money, shared with the API (lib/money.ts).
+export { roundUsd as roundCurrency } from './money';
 
 export function parseInputNumber(value: string): number | undefined {
   const parsed = Number.parseFloat(value);

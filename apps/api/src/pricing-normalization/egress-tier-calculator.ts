@@ -1,3 +1,5 @@
+import { roundUsd as roundCurrency } from '../money.js';
+
 export interface EgressTierRate {
   tierFromGb: number;
   tierToGb?: number | null;
@@ -44,8 +46,4 @@ export function calculateEgressTierBreakdown(
       };
     })
     .filter((tier) => tier.billableGb > 0);
-}
-
-function roundCurrency(value: number): number {
-  return Math.round((value + Number.EPSILON) * 100) / 100;
 }
