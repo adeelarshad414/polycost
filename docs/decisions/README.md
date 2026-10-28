@@ -6,9 +6,10 @@ Numbered, reviewed decisions that change how the system works. An ADR is written
 before the implementation, stays **Proposed** until a maintainer accepts it, and is
 never edited after acceptance except to mark it **Superseded** by a later ADR.
 
-| ADR                                   | Title                                    | Status                                               |
-| ------------------------------------- | ---------------------------------------- | ---------------------------------------------------- |
-| [ADR-0001](ADR-0001-tenancy-model.md) | Tenancy model for core data (audit H-04) | Accepted · implemented (P2-1a to P2-1e); closes H-04 |
+| ADR                                   | Title                                                                          | Status                                               |
+| ------------------------------------- | ------------------------------------------------------------------------------ | ---------------------------------------------------- |
+| [ADR-0001](ADR-0001-tenancy-model.md) | Tenancy model for core data (audit H-04)                                       | Accepted · implemented (P2-1a to P2-1e); closes H-04 |
+| [ADR-0002](ADR-0002-pricing-truth.md) | Pricing truth: one rate source and a nightly accuracy proof (audit H-10, H-12) | Proposed · PR-A (rate card) implemented              |
 
 Template: Status, Date, Audit reference, Context (facts with file references),
 Options considered, Decision, Consequences, Implementation plan, Open questions,

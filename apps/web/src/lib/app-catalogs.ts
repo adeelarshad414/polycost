@@ -5,12 +5,10 @@
 // them, which were otherwise pinned inside the monolith.
 
 import {
-  AppPlatformModelRates,
   ComputeSizePreset,
   ComputeSpecificationProfile,
   ComputeStorageDefault,
   InputMode,
-  ServerlessFunctionRates,
   ServiceCategory,
   ServiceRequirementCategory,
 } from './app-view-types';
@@ -143,54 +141,6 @@ export const PRICING_MODEL_OPTIONS: Array<{
     description: 'Interruptible compute shown as an estimate range.',
   },
 ];
-
-export const REGION_VARIANCE_PROFILES = [
-  {
-    regionId: 'us-east',
-    multiplier: 1,
-    evidence: 'Baseline North America pricing sensitivity.',
-  },
-  {
-    regionId: 'us-central',
-    multiplier: 0.99,
-    evidence: 'Modeled 1% regional discount for central US capacity sensitivity.',
-  },
-  {
-    regionId: 'us-west',
-    multiplier: 1.03,
-    evidence: 'Modeled 3% regional premium for west-coast capacity sensitivity.',
-  },
-  {
-    regionId: 'eu-west',
-    multiplier: 1.08,
-    evidence: 'Modeled 8% regional premium for EU residency/compliance sensitivity.',
-  },
-  {
-    regionId: 'eu-central',
-    multiplier: 1.09,
-    evidence: 'Modeled 9% regional premium for EU central capacity sensitivity.',
-  },
-  {
-    regionId: 'uk',
-    multiplier: 1.1,
-    evidence: 'Modeled 10% regional premium for UK residency sensitivity.',
-  },
-  {
-    regionId: 'canada',
-    multiplier: 1.04,
-    evidence: 'Modeled 4% regional premium for Canada residency sensitivity.',
-  },
-  {
-    regionId: 'ap-southeast',
-    multiplier: 1.12,
-    evidence: 'Modeled 12% regional premium for APAC latency/residency sensitivity.',
-  },
-  {
-    regionId: 'ap-south',
-    multiplier: 0.96,
-    evidence: 'Modeled 4% discount sensitivity for lower-cost APAC alternatives.',
-  },
-] as const;
 
 export const INSTANCE_TIER_OPTIONS: Array<[WorkloadFormState['instanceTier'], string]> = [
   ['small', 'Small - dev/test or light production'],
@@ -505,58 +455,6 @@ export const INITIAL_HOME_FORM: WorkloadFormState = {
   multiAz: false,
   multiRegion: false,
   slaTarget: '',
-};
-
-export const APP_PLATFORM_MODEL_RATES: Record<ProviderId, AppPlatformModelRates> = {
-  aws: {
-    requestPerMillion: 0,
-    vcpuHour: 0.064,
-    memoryGbHour: 0.007,
-    alwaysOnVcpuHour: 0.064,
-    alwaysOnMemoryGbHour: 0.007,
-    evidence: 'App Runner-style active vCPU plus provisioned/active memory model.',
-  },
-  azure: {
-    requestPerMillion: 0.4,
-    vcpuHour: 0.0864,
-    memoryGbHour: 0.009,
-    alwaysOnVcpuHour: 0.095,
-    alwaysOnMemoryGbHour: 0.012,
-    evidence:
-      'App Service always-on plan compared with a request-metered managed-app approximation.',
-  },
-  gcp: {
-    requestPerMillion: 0.4,
-    vcpuHour: 0.0864,
-    memoryGbHour: 0.009,
-    alwaysOnVcpuHour: 0.0648,
-    alwaysOnMemoryGbHour: 0.00675,
-    evidence: 'Cloud Run request-based model compared with always-allocated CPU worker posture.',
-  },
-};
-
-export const SERVERLESS_FUNCTION_RATES: Record<ProviderId, ServerlessFunctionRates> = {
-  aws: {
-    requestPerMillion: 0.2,
-    gbSecond: 0.0000166667,
-    evidence: 'Lambda-style requests plus GB-second duration model.',
-  },
-  azure: {
-    requestPerMillion: 0.2,
-    gbSecond: 0.000016,
-    evidence: 'Azure Functions-style executions plus GB-second duration model.',
-  },
-  gcp: {
-    requestPerMillion: 0.4,
-    gbSecond: 0.0000025,
-    evidence: 'Cloud Run functions-style invocations plus GB-second duration model.',
-  },
-};
-
-export const COMPUTE_ARM_COST_FACTORS: Record<ProviderId, number> = {
-  aws: 0.8,
-  azure: 0.85,
-  gcp: 0.82,
 };
 
 export const COMPUTE_SPEC_PROFILES: Record<

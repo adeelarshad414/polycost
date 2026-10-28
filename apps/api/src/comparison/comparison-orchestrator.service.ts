@@ -1,4 +1,16 @@
 /* eslint-disable security/detect-object-injection -- Reviewed 2026-07-06: comparison maps use typed provider/service/region keys derived from validated NWS input; see docs/SECURITY-SUPPRESSIONS.md. */
+import {
+  MODELED_RATE_CARD,
+  type AiServicesRates,
+  type AnalyticsServicesRates,
+  type DatabaseDimensionRates,
+  type IntegrationServicesRates,
+  type NetworkDimensionRates,
+  type RuntimeServicesRates,
+  type StorageClassKey,
+  type StorageDimensionRates,
+  type SupportingServicesRates,
+} from '../pricing-models/modeled-rate-card.js';
 import { Inject, Injectable } from '@nestjs/common';
 import {
   CloudProviderAdapter,
@@ -65,60 +77,6 @@ interface BurstableCpuCreditPolicy {
   zeroCostLabel: string;
 }
 
-interface NetworkDimensionRates {
-  crossAzPerGb: number;
-  interRegionPerGb: number;
-  cdnViewerPerGb: number;
-  cdnOriginPerGb: number;
-  cdnRequestPerMillion: number;
-  natHourly: number;
-  natPerGb: number;
-  dnsZoneMonthly: number;
-  dnsPerMillionQueries: number;
-  loadBalancerHourly: number;
-  loadBalancerPerGb: number;
-  loadBalancerLcuHour: number;
-  vpnConnectionHourly: number;
-  vpnDataTransferPerGb: number;
-  privateCircuitPortHourly: number;
-  privateCircuitDataTransferPerGb: number;
-}
-
-interface StorageDimensionRates {
-  putPerThousand: number;
-  getPerThousand: number;
-  deletePerThousand: number;
-  listPerThousand: number;
-  retrievalPerGb: Partial<Record<StorageClassKey, number>>;
-  storagePerGbMonth: Partial<Record<StorageClassKey, number>>;
-  minimumDurationDays: Partial<Record<StorageClassKey, number>>;
-  intelligentTieringMonitoringPerThousandObjects: number;
-  replicationSameRegionPerGb: number;
-  replicationCrossRegionPerGb: number;
-  lifecyclePerThousand: number;
-  snapshotPerGbMonth: number;
-  iopsMonth: number;
-  throughputMbpsMonth: number;
-  multiAttachPerGbMonth: number;
-}
-
-interface DatabaseDimensionRates {
-  backupPerGbMonth: number;
-  provisionedIopsMonth: number;
-  readReplicaMonthlyFactor: number;
-  highAvailabilityStandbyFactor: number;
-  crossRegionReplicaTransferPerGb: number;
-  nosqlReadPerMillion: number;
-  nosqlWritePerMillion: number;
-  ruPerSecondMonth: number;
-  queryPerTb: number;
-  cacheReplicaMonthly: number;
-  storageGrowthPerGbMonth: number;
-  searchNodeHour: number;
-  searchStoragePerGbMonth: number;
-  searchQueryPerMillion: number;
-}
-
 interface NoSqlProvisionedCapacityScenario {
   label: string;
   monthlyCostUsd: number;
@@ -130,66 +88,6 @@ interface WarehouseCapacityScenario {
   breakEvenTb: number;
 }
 
-interface SupportingServicesRates {
-  metricPerMillion: number;
-  logIngestPerGb: number;
-  logRetentionPerGbMonth: number;
-  alarmMonthly: number;
-  dashboardMonthly: number;
-  tracePerMillion: number;
-  secretMonthly: number;
-  secretApiPerTenThousand: number;
-  securityResourceMonthly: number;
-  securityFindingPerThousand: number;
-  wafAclMonthly: number;
-  wafRuleMonthly: number;
-  wafRequestPerMillion: number;
-  ddosProtectedResourceMonthly: number;
-}
-
-interface RuntimeServicesRates {
-  functionRequestPerMillion: number;
-  functionGbSecond: number;
-  appPlatformRequestPerMillion: number;
-  appPlatformVcpuHour: number;
-  appPlatformMemoryGbHour: number;
-  appPlatformAlwaysOnVcpuHour: number;
-  appPlatformAlwaysOnMemoryGbHour: number;
-  kubernetesControlPlaneMonthly: number;
-  kubernetesWorkerVcpuHour: number;
-  kubernetesWorkerMemoryGbHour: number;
-  kubernetesNodeOverheadMonthly: number;
-  registryStoragePerGbMonth: number;
-  registryEgressPerGb: number;
-}
-
-interface AnalyticsServicesRates {
-  warehouseStoragePerGbMonth: number;
-  warehouseQueryPerTb: number;
-  dataLakeStoragePerGbMonth: number;
-  integrationJobHour: number;
-  streamingIngestPerGb: number;
-  biUserMonthly: number;
-}
-
-interface AiServicesRates {
-  trainingGpuHour: number;
-  modelHostingHour: number;
-  inferenceRequestPerMillion: number;
-  vectorStoragePerGbMonth: number;
-  vectorQueryPerMillion: number;
-  apiInputTokenPerMillion: number;
-  apiOutputTokenPerMillion: number;
-}
-
-interface IntegrationServicesRates {
-  queueMessagePerMillion: number;
-  eventRoutingPerMillion: number;
-  workflowTransitionPerThousand: number;
-  apiGatewayRequestPerMillion: number;
-}
-
-type StorageClassKey = NonNullable<NormalizedWorkloadSpec['storage'][number]['storageClass']>;
 type WorkloadEnvironment = NonNullable<NormalizedWorkloadSpec['workloadProfile']>['environment'];
 type ComputeTenancy = NonNullable<NormalizedWorkloadSpec['compute'][number]['tenancy']>;
 type DedicatedComputeTenancy = Extract<ComputeTenancy, 'dedicated-host' | 'sole-tenant'>;
@@ -4122,206 +4020,11 @@ function providerFileStorageLabel(providerId: ProviderId): string {
 }
 
 function storageDimensionRates(providerId: ProviderId): StorageDimensionRates {
-  switch (providerId) {
-    case 'aws':
-      return {
-        putPerThousand: 0.005,
-        getPerThousand: 0.0004,
-        deletePerThousand: 0,
-        listPerThousand: 0.005,
-        retrievalPerGb: {
-          'intelligent-tiering': 0.003,
-          'infrequent-access': 0.01,
-          'one-zone-infrequent-access': 0.01,
-          'archive-instant': 0.03,
-          archive: 0.03,
-          'deep-archive': 0.02,
-          cool: 0.01,
-          cold: 0.02,
-          nearline: 0.01,
-          coldline: 0.02,
-        },
-        storagePerGbMonth: {
-          standard: 0.023,
-          hot: 0.023,
-          'intelligent-tiering': 0.023,
-          'infrequent-access': 0.0125,
-          'one-zone-infrequent-access': 0.01,
-          'archive-instant': 0.004,
-          archive: 0.0036,
-          'deep-archive': 0.00099,
-          cool: 0.0125,
-          cold: 0.004,
-          nearline: 0.0125,
-          coldline: 0.004,
-        },
-        minimumDurationDays: {
-          'infrequent-access': 30,
-          'one-zone-infrequent-access': 30,
-          'archive-instant': 90,
-          archive: 90,
-          'deep-archive': 180,
-          cool: 30,
-          cold: 90,
-          nearline: 30,
-          coldline: 90,
-        },
-        intelligentTieringMonitoringPerThousandObjects: 0.0025,
-        replicationSameRegionPerGb: 0.01,
-        replicationCrossRegionPerGb: 0.02,
-        lifecyclePerThousand: 0.01,
-        snapshotPerGbMonth: 0.05,
-        iopsMonth: 0.005,
-        throughputMbpsMonth: 0.04,
-        multiAttachPerGbMonth: 0.02,
-      };
-    case 'azure':
-      return {
-        putPerThousand: 0.004,
-        getPerThousand: 0.0004,
-        deletePerThousand: 0,
-        listPerThousand: 0.004,
-        retrievalPerGb: {
-          cool: 0.01,
-          cold: 0.02,
-          archive: 0.02,
-          'deep-archive': 0.02,
-          'infrequent-access': 0.01,
-          nearline: 0.01,
-          coldline: 0.02,
-        },
-        storagePerGbMonth: {
-          standard: 0.0184,
-          hot: 0.0184,
-          cool: 0.01,
-          cold: 0.0036,
-          archive: 0.00099,
-          'deep-archive': 0.00099,
-          'infrequent-access': 0.01,
-          nearline: 0.01,
-          coldline: 0.0036,
-          premium: 0.15,
-          ultra: 0.18,
-        },
-        minimumDurationDays: {
-          cool: 30,
-          cold: 90,
-          archive: 180,
-          'deep-archive': 180,
-          'infrequent-access': 30,
-          nearline: 30,
-          coldline: 90,
-        },
-        intelligentTieringMonitoringPerThousandObjects: 0.0025,
-        replicationSameRegionPerGb: 0.008,
-        replicationCrossRegionPerGb: 0.018,
-        lifecyclePerThousand: 0.01,
-        snapshotPerGbMonth: 0.045,
-        iopsMonth: 0.004,
-        throughputMbpsMonth: 0.035,
-        multiAttachPerGbMonth: 0.015,
-      };
-    case 'gcp':
-      return {
-        putPerThousand: 0.005,
-        getPerThousand: 0.0004,
-        deletePerThousand: 0,
-        listPerThousand: 0.005,
-        retrievalPerGb: {
-          nearline: 0.01,
-          coldline: 0.02,
-          archive: 0.05,
-          'deep-archive': 0.05,
-          cool: 0.01,
-          cold: 0.02,
-          'infrequent-access': 0.01,
-        },
-        storagePerGbMonth: {
-          standard: 0.02,
-          hot: 0.02,
-          nearline: 0.01,
-          coldline: 0.004,
-          archive: 0.0012,
-          'deep-archive': 0.0012,
-          cool: 0.01,
-          cold: 0.004,
-          'infrequent-access': 0.01,
-        },
-        minimumDurationDays: {
-          nearline: 30,
-          coldline: 90,
-          archive: 365,
-          'deep-archive': 365,
-          cool: 30,
-          cold: 90,
-          'infrequent-access': 30,
-        },
-        intelligentTieringMonitoringPerThousandObjects: 0.0025,
-        replicationSameRegionPerGb: 0.01,
-        replicationCrossRegionPerGb: 0.02,
-        lifecyclePerThousand: 0.01,
-        snapshotPerGbMonth: 0.026,
-        iopsMonth: 0.0045,
-        throughputMbpsMonth: 0.032,
-        multiAttachPerGbMonth: 0.012,
-      };
-  }
+  return MODELED_RATE_CARD.storage.rates[providerId];
 }
 
 function databaseDimensionRates(providerId: ProviderId): DatabaseDimensionRates {
-  switch (providerId) {
-    case 'aws':
-      return {
-        backupPerGbMonth: 0.095,
-        provisionedIopsMonth: 0.1,
-        readReplicaMonthlyFactor: 0.85,
-        highAvailabilityStandbyFactor: 0.55,
-        crossRegionReplicaTransferPerGb: 0.02,
-        nosqlReadPerMillion: 0.25,
-        nosqlWritePerMillion: 1.25,
-        ruPerSecondMonth: 0.008,
-        queryPerTb: 5,
-        cacheReplicaMonthly: 45,
-        storageGrowthPerGbMonth: 0.115,
-        searchNodeHour: 0.24,
-        searchStoragePerGbMonth: 0.135,
-        searchQueryPerMillion: 0,
-      };
-    case 'azure':
-      return {
-        backupPerGbMonth: 0.1,
-        provisionedIopsMonth: 0.065,
-        readReplicaMonthlyFactor: 0.9,
-        highAvailabilityStandbyFactor: 0.6,
-        crossRegionReplicaTransferPerGb: 0.018,
-        nosqlReadPerMillion: 0.3,
-        nosqlWritePerMillion: 1.2,
-        ruPerSecondMonth: 0.008,
-        queryPerTb: 5,
-        cacheReplicaMonthly: 42,
-        storageGrowthPerGbMonth: 0.12,
-        searchNodeHour: 0.336,
-        searchStoragePerGbMonth: 0.1,
-        searchQueryPerMillion: 0,
-      };
-    case 'gcp':
-      return {
-        backupPerGbMonth: 0.08,
-        provisionedIopsMonth: 0.065,
-        readReplicaMonthlyFactor: 0.85,
-        highAvailabilityStandbyFactor: 0.55,
-        crossRegionReplicaTransferPerGb: 0.02,
-        nosqlReadPerMillion: 0.18,
-        nosqlWritePerMillion: 1.08,
-        ruPerSecondMonth: 0.0075,
-        queryPerTb: 5,
-        cacheReplicaMonthly: 40,
-        storageGrowthPerGbMonth: 0.17,
-        searchNodeHour: 0.008219,
-        searchStoragePerGbMonth: 5,
-        searchQueryPerMillion: 1500,
-      };
-  }
+  return MODELED_RATE_CARD.database.rates[providerId];
 }
 
 function noSqlProvisionedCapacityScenario(input: {
@@ -4512,59 +4215,7 @@ function providerManagedSearchLabel(providerId: ProviderId): string {
 }
 
 function supportingServicesRates(providerId: ProviderId): SupportingServicesRates {
-  switch (providerId) {
-    case 'aws':
-      return {
-        metricPerMillion: 0.3,
-        logIngestPerGb: 0.5,
-        logRetentionPerGbMonth: 0.03,
-        alarmMonthly: 0.1,
-        dashboardMonthly: 3,
-        tracePerMillion: 5,
-        secretMonthly: 0.4,
-        secretApiPerTenThousand: 0.05,
-        securityResourceMonthly: 0.03,
-        securityFindingPerThousand: 0.2,
-        wafAclMonthly: 5,
-        wafRuleMonthly: 1,
-        wafRequestPerMillion: 0.6,
-        ddosProtectedResourceMonthly: 3000,
-      };
-    case 'azure':
-      return {
-        metricPerMillion: 0.258,
-        logIngestPerGb: 2.76,
-        logRetentionPerGbMonth: 0.12,
-        alarmMonthly: 0.1,
-        dashboardMonthly: 3,
-        tracePerMillion: 2.3,
-        secretMonthly: 0.03,
-        secretApiPerTenThousand: 0.03,
-        securityResourceMonthly: 0.02,
-        securityFindingPerThousand: 0.15,
-        wafAclMonthly: 20,
-        wafRuleMonthly: 1,
-        wafRequestPerMillion: 0.6,
-        ddosProtectedResourceMonthly: 199,
-      };
-    case 'gcp':
-      return {
-        metricPerMillion: 0.258,
-        logIngestPerGb: 0.5,
-        logRetentionPerGbMonth: 0.01,
-        alarmMonthly: 0.1,
-        dashboardMonthly: 3,
-        tracePerMillion: 0.2,
-        secretMonthly: 0.06,
-        secretApiPerTenThousand: 0.03,
-        securityResourceMonthly: 0.02,
-        securityFindingPerThousand: 0.1,
-        wafAclMonthly: 5,
-        wafRuleMonthly: 1,
-        wafRequestPerMillion: 0.75,
-        ddosProtectedResourceMonthly: 3000,
-      };
-  }
+  return MODELED_RATE_CARD.supportingServices.rates[providerId];
 }
 
 function supportingServicesAssumptions(
@@ -4616,56 +4267,7 @@ function maxScaleParam(requirements: ServiceRequirement[], key: string): number 
 }
 
 function runtimeServicesRates(providerId: ProviderId): RuntimeServicesRates {
-  switch (providerId) {
-    case 'aws':
-      return {
-        functionRequestPerMillion: 0.2,
-        functionGbSecond: 0.0000166667,
-        appPlatformRequestPerMillion: 0,
-        appPlatformVcpuHour: 0.064,
-        appPlatformMemoryGbHour: 0.007,
-        appPlatformAlwaysOnVcpuHour: 0.064,
-        appPlatformAlwaysOnMemoryGbHour: 0.007,
-        kubernetesControlPlaneMonthly: 73,
-        kubernetesWorkerVcpuHour: 0.0416,
-        kubernetesWorkerMemoryGbHour: 0.0046,
-        kubernetesNodeOverheadMonthly: 8,
-        registryStoragePerGbMonth: 0.1,
-        registryEgressPerGb: 0.09,
-      };
-    case 'azure':
-      return {
-        functionRequestPerMillion: 0.2,
-        functionGbSecond: 0.000016,
-        appPlatformRequestPerMillion: 0.4,
-        appPlatformVcpuHour: 0.0864,
-        appPlatformMemoryGbHour: 0.009,
-        appPlatformAlwaysOnVcpuHour: 0.095,
-        appPlatformAlwaysOnMemoryGbHour: 0.012,
-        kubernetesControlPlaneMonthly: 0,
-        kubernetesWorkerVcpuHour: 0.0464,
-        kubernetesWorkerMemoryGbHour: 0.0052,
-        kubernetesNodeOverheadMonthly: 6,
-        registryStoragePerGbMonth: 0.167,
-        registryEgressPerGb: 0.087,
-      };
-    case 'gcp':
-      return {
-        functionRequestPerMillion: 0.4,
-        functionGbSecond: 0.0000025,
-        appPlatformRequestPerMillion: 0.4,
-        appPlatformVcpuHour: 0.0864,
-        appPlatformMemoryGbHour: 0.009,
-        appPlatformAlwaysOnVcpuHour: 0.0648,
-        appPlatformAlwaysOnMemoryGbHour: 0.00675,
-        kubernetesControlPlaneMonthly: 73,
-        kubernetesWorkerVcpuHour: 0.0332,
-        kubernetesWorkerMemoryGbHour: 0.0045,
-        kubernetesNodeOverheadMonthly: 7,
-        registryStoragePerGbMonth: 0.1,
-        registryEgressPerGb: 0.12,
-      };
-  }
+  return MODELED_RATE_CARD.runtimeServices.rates[providerId];
 }
 
 function runtimeServicesAssumptions(
@@ -4710,35 +4312,7 @@ function runtimeServicesAssumptions(
 }
 
 function analyticsServicesRates(providerId: ProviderId): AnalyticsServicesRates {
-  switch (providerId) {
-    case 'aws':
-      return {
-        warehouseStoragePerGbMonth: 0.024,
-        warehouseQueryPerTb: 5,
-        dataLakeStoragePerGbMonth: 0.023,
-        integrationJobHour: 0.44,
-        streamingIngestPerGb: 0.014,
-        biUserMonthly: 24,
-      };
-    case 'azure':
-      return {
-        warehouseStoragePerGbMonth: 0.024,
-        warehouseQueryPerTb: 5,
-        dataLakeStoragePerGbMonth: 0.0208,
-        integrationJobHour: 0.25,
-        streamingIngestPerGb: 0.03,
-        biUserMonthly: 10,
-      };
-    case 'gcp':
-      return {
-        warehouseStoragePerGbMonth: 0.02,
-        warehouseQueryPerTb: 6.25,
-        dataLakeStoragePerGbMonth: 0.02,
-        integrationJobHour: 0.18,
-        streamingIngestPerGb: 0.04,
-        biUserMonthly: 30,
-      };
-  }
+  return MODELED_RATE_CARD.analyticsServices.rates[providerId];
 }
 
 function warehouseCapacityScenario(
@@ -4793,38 +4367,7 @@ function analyticsServicesAssumptions(
 }
 
 function aiServicesRates(providerId: ProviderId): AiServicesRates {
-  switch (providerId) {
-    case 'aws':
-      return {
-        trainingGpuHour: 3.06,
-        modelHostingHour: 0.24,
-        inferenceRequestPerMillion: 0.2,
-        vectorStoragePerGbMonth: 0.25,
-        vectorQueryPerMillion: 0.1,
-        apiInputTokenPerMillion: 0.8,
-        apiOutputTokenPerMillion: 2.4,
-      };
-    case 'azure':
-      return {
-        trainingGpuHour: 3.67,
-        modelHostingHour: 0.28,
-        inferenceRequestPerMillion: 0.18,
-        vectorStoragePerGbMonth: 0.23,
-        vectorQueryPerMillion: 0.12,
-        apiInputTokenPerMillion: 0.5,
-        apiOutputTokenPerMillion: 1.5,
-      };
-    case 'gcp':
-      return {
-        trainingGpuHour: 2.93,
-        modelHostingHour: 0.22,
-        inferenceRequestPerMillion: 0.25,
-        vectorStoragePerGbMonth: 0.2,
-        vectorQueryPerMillion: 0.08,
-        apiInputTokenPerMillion: 0.35,
-        apiOutputTokenPerMillion: 1.05,
-      };
-  }
+  return MODELED_RATE_CARD.aiServices.rates[providerId];
 }
 
 function aiServicesAssumptions(
@@ -4851,29 +4394,7 @@ function aiServicesAssumptions(
 }
 
 function integrationServicesRates(providerId: ProviderId): IntegrationServicesRates {
-  switch (providerId) {
-    case 'aws':
-      return {
-        queueMessagePerMillion: 0.4,
-        eventRoutingPerMillion: 1,
-        workflowTransitionPerThousand: 0.025,
-        apiGatewayRequestPerMillion: 3.5,
-      };
-    case 'azure':
-      return {
-        queueMessagePerMillion: 0.05,
-        eventRoutingPerMillion: 0.6,
-        workflowTransitionPerThousand: 0.025,
-        apiGatewayRequestPerMillion: 3.5,
-      };
-    case 'gcp':
-      return {
-        queueMessagePerMillion: 0.4,
-        eventRoutingPerMillion: 0.6,
-        workflowTransitionPerThousand: 0.025,
-        apiGatewayRequestPerMillion: 3,
-      };
-  }
+  return MODELED_RATE_CARD.integrationServices.rates[providerId];
 }
 
 function integrationServicesAssumptions(
@@ -4900,65 +4421,7 @@ function integrationServicesAssumptions(
 }
 
 function networkDimensionRates(providerId: ProviderId): NetworkDimensionRates {
-  switch (providerId) {
-    case 'aws':
-      return {
-        crossAzPerGb: 0.01,
-        interRegionPerGb: 0.02,
-        cdnViewerPerGb: 0.085,
-        cdnOriginPerGb: 0.01,
-        cdnRequestPerMillion: 0.75,
-        natHourly: 0.045,
-        natPerGb: 0.045,
-        dnsZoneMonthly: 0.5,
-        dnsPerMillionQueries: 0.4,
-        loadBalancerHourly: 0.0225,
-        loadBalancerPerGb: 0.008,
-        loadBalancerLcuHour: 0.008,
-        vpnConnectionHourly: 0.05,
-        vpnDataTransferPerGb: 0.09,
-        privateCircuitPortHourly: 0.3,
-        privateCircuitDataTransferPerGb: 0.02,
-      };
-    case 'azure':
-      return {
-        crossAzPerGb: 0.01,
-        interRegionPerGb: 0.02,
-        cdnViewerPerGb: 0.081,
-        cdnOriginPerGb: 0.01,
-        cdnRequestPerMillion: 0.75,
-        natHourly: 0.045,
-        natPerGb: 0.045,
-        dnsZoneMonthly: 0.5,
-        dnsPerMillionQueries: 0.4,
-        loadBalancerHourly: 0.025,
-        loadBalancerPerGb: 0.005,
-        loadBalancerLcuHour: 0.008,
-        vpnConnectionHourly: 0.05,
-        vpnDataTransferPerGb: 0.087,
-        privateCircuitPortHourly: 0.42,
-        privateCircuitDataTransferPerGb: 0.025,
-      };
-    case 'gcp':
-      return {
-        crossAzPerGb: 0.01,
-        interRegionPerGb: 0.02,
-        cdnViewerPerGb: 0.08,
-        cdnOriginPerGb: 0.01,
-        cdnRequestPerMillion: 0.75,
-        natHourly: 0.0014,
-        natPerGb: 0.045,
-        dnsZoneMonthly: 0.2,
-        dnsPerMillionQueries: 0.4,
-        loadBalancerHourly: 0.025,
-        loadBalancerPerGb: 0.008,
-        loadBalancerLcuHour: 0.008,
-        vpnConnectionHourly: 0.05,
-        vpnDataTransferPerGb: 0.12,
-        privateCircuitPortHourly: 2.428,
-        privateCircuitDataTransferPerGb: 0.02,
-      };
-  }
+  return MODELED_RATE_CARD.network.rates[providerId];
 }
 
 function directInternetEgressPlanningRate(providerId: ProviderId): number {
@@ -5012,80 +4475,22 @@ function interRegionRouteRate(
   };
 }
 
-const AWS_INTER_REGION_ROUTE_RATES = new Map<string, number>([
-  ['us-east->us-west', 0.02],
-  ['us-east->eu-west', 0.05],
-  ['us-east->ap-south', 0.09],
-  ['us-west->ap-south', 0.09],
-  ['eu-west->ap-south', 0.09],
-]);
-
-const AZURE_INTER_REGION_ROUTE_RATES = new Map<string, number>([
-  ['us-east->us-west', 0.02],
-  ['us-east->eu-west', 0.05],
-  ['us-east->ap-south', 0.087],
-  ['eu-west->ap-south', 0.087],
-]);
-
-const GCP_INTER_REGION_ROUTE_RATES = new Map<string, number>([
-  ['us-central->us-east', 0.01],
-  ['us-central->europe-west', 0.08],
-  ['us-east->europe-west', 0.08],
-  ['us-central->asia-south', 0.12],
-  ['europe-west->asia-south', 0.12],
-]);
-
+// ADR-0002: these modeled rates live in the rate card, the one copy the web
+// app also reads (GET /pricing/rate-card), each with a source and review date.
 function interRegionRouteRates(providerId: ProviderId): ReadonlyMap<string, number> {
-  switch (providerId) {
-    case 'aws':
-      return AWS_INTER_REGION_ROUTE_RATES;
-    case 'azure':
-      return AZURE_INTER_REGION_ROUTE_RATES;
-    case 'gcp':
-      return GCP_INTER_REGION_ROUTE_RATES;
-  }
+  return new Map(Object.entries(MODELED_RATE_CARD.interRegionTransfer.rates[providerId].routes));
 }
 
 function burstableCpuCreditPolicy(providerId: ProviderId): BurstableCpuCreditPolicy {
-  switch (providerId) {
-    case 'aws':
-      return {
-        familyLabel: 'T-series',
-        baselineUtilizationPercent: 20,
-        unitPriceUsd: 0.05,
-        unit: 'vCPU-credit-hour',
-        zeroCostLabel: 'CPU credit baseline signal',
-      };
-    case 'azure':
-      return {
-        familyLabel: 'B-series',
-        baselineUtilizationPercent: 20,
-        unitPriceUsd: 0,
-        unit: 'vCPU-credit-hour',
-        zeroCostLabel: 'CPU credit depletion risk signal',
-      };
-    case 'gcp':
-      return {
-        familyLabel: 'E2 shared-core',
-        baselineUtilizationPercent: 20,
-        unitPriceUsd: 0,
-        unit: 'vCPU-credit-hour',
-        zeroCostLabel: 'scheduling risk signal',
-      };
-  }
+  return MODELED_RATE_CARD.burstableCredits.rates[providerId];
 }
 
 function interRegionContinentFallbackRates(providerId: ProviderId): {
   sameContinent: number;
   crossContinent: number;
 } {
-  switch (providerId) {
-    case 'aws':
-    case 'azure':
-      return { sameContinent: 0.02, crossContinent: 0.05 };
-    case 'gcp':
-      return { sameContinent: 0.01, crossContinent: 0.08 };
-  }
+  const { sameContinent, crossContinent } = MODELED_RATE_CARD.interRegionTransfer.rates[providerId];
+  return { sameContinent, crossContinent };
 }
 
 function normalizedRegionRouteKey(region: string | undefined): string {

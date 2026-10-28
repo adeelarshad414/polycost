@@ -1889,3 +1889,40 @@ export interface TeamDomainRecord {
   lastCheckedAt?: string;
   verifiedAt?: string;
 }
+
+/**
+ * The modeled rate card (ADR-0002): rates that approximate a pricing model rather
+ * than a single SKU, served by GET /pricing/rate-card with when each was last
+ * checked. The web app holds no copy of these numbers.
+ */
+export interface ModeledRateGroup<T> {
+  source: string;
+  reviewedAt: string;
+  rates: T;
+}
+
+export interface ModeledRateCard {
+  kind: 'modeled';
+  pricingAsOf: string;
+  maxAgeDays: number;
+  appPlatform: ModeledRateGroup<
+    Record<
+      ProviderId,
+      {
+        requestPerMillion: number;
+        vcpuHour: number;
+        memoryGbHour: number;
+        alwaysOnVcpuHour: number;
+        alwaysOnMemoryGbHour: number;
+        evidence: string;
+      }
+    >
+  >;
+  serverlessFunctions: ModeledRateGroup<
+    Record<ProviderId, { requestPerMillion: number; gbSecond: number; evidence: string }>
+  >;
+  computeArmCostFactors: ModeledRateGroup<Record<ProviderId, number>>;
+  regionVariance: ModeledRateGroup<
+    Array<{ regionId: string; multiplier: number; evidence: string }>
+  >;
+}

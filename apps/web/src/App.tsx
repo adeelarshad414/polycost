@@ -58,7 +58,6 @@ import {
   storeRequirementSession,
 } from './lib/optimization-signals';
 import {
-  APP_PLATFORM_MODEL_RATES,
   AUTH_SESSION_EXPIRES_AT_STORAGE_KEY,
   AUTH_SESSION_STORAGE_KEY,
   COMPARISON_HISTORY_STORAGE_KEY,
@@ -82,7 +81,6 @@ import {
   REQUIREMENTS_FILE_ACCEPT,
   REQUIREMENTS_FILE_MAX_BYTES,
   REQUIREMENT_SESSION_STORAGE_KEY,
-  SERVERLESS_FUNCTION_RATES,
   SERVICE_CATEGORIES,
   STORAGE_CLASS_OPTIONS,
   STORAGE_REPLICATION_OPTIONS,
@@ -357,6 +355,7 @@ import {
   TerraformRuntimeTarget,
   TerraformTargetCloud,
   ResourceOwnership,
+  ModeledRateCard,
 } from './types';
 import {
   ARCHITECTURE_TEMPLATES,
@@ -396,6 +395,7 @@ const WorkspaceControlCenter = lazy(() =>
 import { comparisonIdFromPath, comparisonPath } from './lib/comparison-route';
 import { OwnershipBar } from './features/tenancy/OwnershipBar';
 import { COOKIE_SESSION } from './lib/session';
+import { useModeledRateCard } from './lib/rate-card';
 
 export function App({ client = polyCostClient }: AppProps) {
   const shareToken = shareTokenFromLocation();
@@ -3034,6 +3034,7 @@ function StateDetailContent({
           <EngineeringAnalyticsDashboard comparison={comparison} interval={interval} />
           <ServiceCheapestMatrix comparison={comparison} interval={interval} />
           <ProductionDepthAnalytics
+            client={client}
             comparison={comparison}
             form={form}
             serverAnalytics={comparisonAnalytics}
@@ -6610,6 +6611,7 @@ export function ComparisonView({
           <TerraformGenerationPanel client={client} comparison={comparison} form={form} />
           <ServiceCheapestMatrix comparison={comparison} interval={interval} />
           <ProductionDepthAnalytics
+            client={client}
             comparison={comparison}
             form={form}
             serverAnalytics={analytics}
@@ -7375,21 +7377,26 @@ function ServiceCheapestMatrix({
 }
 
 function ProductionDepthAnalytics({
+  client,
   comparison,
   form,
   serverAnalytics,
 }: {
+  client: PolyCostClient;
   comparison: ComparisonResult | null;
   form: WorkloadFormState;
   serverAnalytics?: ComparisonAnalyticsResponse | null;
 }) {
+  // ADR-0002: modeled figures use the API rate card, never a bundled copy.
+  const rateCard = useModeledRateCard(client);
   const insights = productionDepthInsights(comparison, form);
   const providerDeltas = providerDeltaRows(comparison);
-  const computeSpecifications = computeSpecificationRows(comparison, form);
+  const computeSpecifications = computeSpecificationRows(comparison, form, rateCard);
   const regionVariance = regionVarianceRows(
     comparison,
     form,
     serverAnalytics?.regionVarianceHeatMap,
+    rateCard,
   );
   const commitmentCoverage = commitmentCoverageGapRows(comparison, form);
   const tcoSignals = crossProviderTcoRows(comparison, form, serverAnalytics?.tcoSignals);
@@ -7398,8 +7405,8 @@ function ProductionDepthAnalytics({
   const databaseOptimizations = databaseOptimizationRows(comparison, form);
   const databaseAnatomy = databaseAnatomyRows(comparison, form);
   const runtimeOptimizations = runtimeOptimizationRows(comparison, form);
-  const serverlessMemoryCurves = serverlessMemoryCurveRows(comparison, form);
-  const appPlatformModels = appPlatformModelRows(comparison, form);
+  const serverlessMemoryCurves = serverlessMemoryCurveRows(comparison, form, rateCard);
+  const appPlatformModels = appPlatformModelRows(comparison, form, rateCard);
   const operationsOptimizations = operationsOptimizationRows(comparison, form);
   const egressOptimizations = egressOptimizationRows(comparison, form);
   const networkingCosts = networkingCostRows(comparison, serverAnalytics?.egressNetworkingDetails);
@@ -7426,6 +7433,21 @@ function ProductionDepthAnalytics({
         <p>
           These cards are derived from the current comparison, workload profile, pricing models,
           line items, and explicit modeled assumptions.
+          {rateCard ? (
+            <>
+              {' '}
+              Modeled rates last reviewed{' '}
+              {new Date(`${rateCard.pricingAsOf}T00:00:00Z`).toLocaleDateString('en-US', {
+                year: 'numeric',
+                month: 'short',
+                day: 'numeric',
+                timeZone: 'UTC',
+              })}
+              .
+            </>
+          ) : (
+            ' Modeled rates are unavailable right now, so figures built on them are hidden.'
+          )}
         </p>
       </div>
       <div className="production-depth-grid">
@@ -9355,6 +9377,7 @@ function PricingEvidencePanel({
 function computeSpecificationRows(
   comparison: ComparisonResult | null,
   form: WorkloadFormState,
+  rateCard: ModeledRateCard | null,
 ): ComputeSpecificationRow[] {
   if (!comparison) {
     return [];
@@ -9393,7 +9416,12 @@ function computeSpecificationRows(
       const familyLabel = computeFamilyLabel(profile, architecture);
       const memoryPerDollar = totalMemoryGb / computeMonthly;
       const hourlyEffective = computeMonthly / HOURS_PER_MONTH;
-      const armDelta = computeArchitectureDelta(provider.providerId, computeMonthly, architecture);
+      const armDelta = computeArchitectureDelta(
+        provider.providerId,
+        computeMonthly,
+        architecture,
+        rateCard,
+      );
       const tenancySignal = computeTenancySignal(form, vcpu, activeInstances);
       const architectureFit =
         architecture === 'gpu'
@@ -9843,8 +9871,10 @@ function databaseAnatomyRows(
 function serverlessMemoryCurveRows(
   comparison: ComparisonResult | null,
   form: WorkloadFormState,
+  rateCard: ModeledRateCard | null,
 ): ServerlessMemoryCurveRow[] {
-  if (!comparison) {
+  // ADR-0002: modeled from the API rate card only; nothing to show without it.
+  if (!comparison || !rateCard) {
     return [];
   }
 
@@ -9875,16 +9905,16 @@ function serverlessMemoryCurveRows(
 
   return comparison.providers
     .map((provider) => {
-      const currentMonthly = serverlessFunctionMonthly(provider.providerId, {
-        requestsMillion,
-        durationMs: currentDurationMs,
-        memoryMb: currentMemoryMb,
-      });
-      const modeledMonthly = serverlessFunctionMonthly(provider.providerId, {
-        requestsMillion,
-        durationMs: breakEvenDurationMs,
-        memoryMb: breakEvenMemoryMb,
-      });
+      const currentMonthly = serverlessFunctionMonthly(
+        provider.providerId,
+        { requestsMillion, durationMs: currentDurationMs, memoryMb: currentMemoryMb },
+        rateCard,
+      );
+      const modeledMonthly = serverlessFunctionMonthly(
+        provider.providerId,
+        { requestsMillion, durationMs: breakEvenDurationMs, memoryMb: breakEvenMemoryMb },
+        rateCard,
+      );
       const deltaPercent =
         currentMonthly > 0 ? ((modeledMonthly - currentMonthly) / currentMonthly) * 100 : 0;
 
@@ -9901,7 +9931,7 @@ function serverlessMemoryCurveRows(
         recommendation: `Benchmark ${formatDecimal(breakEvenMemoryMb)}MB; keep duration at or below ${formatDecimal(
           breakEvenDurationMs,
         )}ms to improve latency without raising compute cost.`,
-        evidence: `${SERVERLESS_FUNCTION_RATES[provider.providerId].evidence} ${formatDecimal(
+        evidence: `${rateCard.serverlessFunctions.rates[provider.providerId].evidence} ${formatDecimal(
           breakEvenMemoryMb,
         )}MB is the linear break-even point for the configured ${formatDecimal(
           currentDurationMs,
@@ -9914,8 +9944,10 @@ function serverlessMemoryCurveRows(
 function appPlatformModelRows(
   comparison: ComparisonResult | null,
   form: WorkloadFormState,
+  rateCard: ModeledRateCard | null,
 ): AppPlatformModelRow[] {
-  if (!comparison) {
+  // ADR-0002: modeled from the API rate card only; nothing to show without it.
+  if (!comparison || !rateCard) {
     return [];
   }
 
@@ -9955,23 +9987,21 @@ function appPlatformModelRows(
       const requestBasedMonthly =
         requestLineMonthly > 0
           ? requestLineMonthly
-          : appPlatformRequestMonthly(provider.providerId, {
-              durationMs,
-              memoryGb,
-              requestsMillion,
-              vcpu,
-            });
-      const alwaysOnMonthly = appPlatformAlwaysOnMonthly(provider.providerId, {
-        alwaysOnHours,
-        memoryGb,
-        minInstances,
-        vcpu,
-      });
+          : appPlatformRequestMonthly(
+              provider.providerId,
+              { durationMs, memoryGb, requestsMillion, vcpu },
+              rateCard,
+            );
+      const alwaysOnMonthly = appPlatformAlwaysOnMonthly(
+        provider.providerId,
+        { alwaysOnHours, memoryGb, minInstances, vcpu },
+        rateCard,
+      );
       const winningModel: AppPlatformModelRow['winningModel'] =
         requestBasedMonthly <= alwaysOnMonthly ? 'Request-based' : 'Always-on';
       const monthlyDelta = roundCurrency(Math.abs(alwaysOnMonthly - requestBasedMonthly));
       const annualDelta = roundCurrency(monthlyDelta * 12);
-      const rates = APP_PLATFORM_MODEL_RATES[provider.providerId];
+      const rates = rateCard.appPlatform.rates[provider.providerId];
       const recommendation =
         winningModel === 'Request-based'
           ? `Keep scale-to-zero/request-based posture; always-on would add ${formatCurrency(

@@ -12,6 +12,7 @@ import { AppConfig } from '../config/config.schema.js';
 import { providerRegionForCanonicalRegion } from '../pricing-normalization/region-map.js';
 import { PaymentOptionCode, PricingGranularity, PricingTermCode } from './pricing-models.types.js';
 import { PricingMatrixService } from './pricing-matrix.service.js';
+import { rateCardResponse, type RateCardResponse } from './modeled-rate-card.js';
 import { RouteAccess } from '../api/route-access.js';
 
 type QueryValue = string | string[] | undefined;
@@ -37,6 +38,20 @@ export class PricingModelsController {
     private readonly apiRateLimitService: ApiRateLimitService,
     private readonly configService: ConfigService<AppConfig, true>,
   ) {}
+
+  /**
+   * ADR-0002: the modeled rates (app platforms, functions, ARM ratios, regional
+   * premiums, inter-region transfer, burstable credits), each with its source
+   * and review date. The web app shows modeled figures only from this response.
+   */
+  @Get('rate-card')
+  async rateCard(
+    @Req() request?: RequestLike,
+    @Res({ passthrough: true }) response?: RateLimitHeaderResponse,
+  ): Promise<RateCardResponse> {
+    await this.consumeRateLimit('pricing_rate_card', request, response);
+    return rateCardResponse();
+  }
 
   @Get(':provider/:service')
   async rate(
