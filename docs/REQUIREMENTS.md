@@ -95,12 +95,13 @@
 
 ### NFR-1 · Correctness
 
-| ID      | Requirement                                              | How it is enforced                                    |
-| ------- | -------------------------------------------------------- | ----------------------------------------------------- |
-| NFR-1.1 | Pricing must equal a manual provider calculation         | Golden-file accuracy harness vs. provider calculators |
-| NFR-1.2 | Money uses `NUMERIC` in the database, never float        | Schema-enforced                                       |
-| NFR-1.3 | Currency is explicit; mixed-currency sums are impossible | Non-USD import rejected                               |
-| NFR-1.4 | Timestamps are UTC-anchored `timestamptz`                | Migration 042                                         |
+| ID      | Requirement                                                                                 | How it is enforced                                    |
+| ------- | ------------------------------------------------------------------------------------------- | ----------------------------------------------------- |
+| NFR-1.1 | Pricing must equal a manual provider calculation                                            | Golden-file accuracy harness vs. provider calculators |
+| NFR-1.2 | Money uses `NUMERIC` in the database, never float                                           | Schema-enforced                                       |
+| NFR-1.3 | Currency is explicit; mixed-currency sums are impossible                                    | Non-USD import rejected                               |
+| NFR-1.4 | Timestamps are UTC-anchored `timestamptz`                                                   | Migration 042                                         |
+| NFR-1.5 | Money arithmetic is exact to the micro-dollar, with one rounding rule (half away from zero) | `money.ts` in API and web, shared case table          |
 
 ### NFR-2 · Security
 

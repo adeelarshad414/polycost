@@ -1070,7 +1070,8 @@ export interface InvoiceReconciliationRecord {
   estimatedTotalUsd: number;
   invoicedTotalUsd: number;
   varianceUsd: number;
-  variancePercent: number;
+  /** Null when there was no estimate to compare against (audit M-04). */
+  variancePercent: number | null;
   status: 'matched' | 'variance-warning' | 'variance-critical' | 'unmatched';
   evidence: Record<string, unknown>;
   createdAt: string;

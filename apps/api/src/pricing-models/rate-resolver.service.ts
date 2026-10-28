@@ -1,3 +1,4 @@
+import { roundRateUsd } from '../money.js';
 import { Injectable } from '@nestjs/common';
 import { ApiValidationError } from '../api/api-errors.js';
 import { HOURS_PER_DAY, HOURS_PER_MONTH, HOURS_PER_WEEK, HOURS_PER_YEAR } from '../cost-time.js';
@@ -159,7 +160,7 @@ export function intervalsFromHourlyRate(hourlyRateUsd: number): RateIntervals {
 }
 
 function roundRate(value: number): number {
-  return Math.round((value + Number.EPSILON) * 1_000_000) / 1_000_000;
+  return roundRateUsd(value);
 }
 
 function amountForGranularity(intervals: RateIntervals, granularity: PricingGranularity): number {

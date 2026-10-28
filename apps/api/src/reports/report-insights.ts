@@ -1,3 +1,4 @@
+import { roundUsd as roundCurrency } from '../money.js';
 import { ComparisonResult } from '../comparison/comparison.types.js';
 
 export interface ReportInsight {
@@ -136,8 +137,4 @@ function dominantCategory(
   return [...totals.entries()]
     .map(([category, total]) => ({ category, total }))
     .sort((left, right) => right.total - left.total)[0];
-}
-
-function roundCurrency(value: number): number {
-  return Math.round((value + Number.EPSILON) * 100) / 100;
 }

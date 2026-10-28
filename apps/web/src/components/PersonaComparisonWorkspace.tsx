@@ -1,3 +1,4 @@
+import { roundUsd as roundCurrency } from '../lib/money';
 import { useEffect, useMemo, useState } from 'react';
 import { configuredApiBaseUrl } from '../api-client';
 import { Button } from './Button';
@@ -1154,10 +1155,6 @@ function providerLabel(provider: ProviderId): string {
     case 'gcp':
       return 'GCP';
   }
-}
-
-function roundCurrency(value: number): number {
-  return Math.round((value + Number.EPSILON) * 100) / 100;
 }
 
 function formatCurrency(value: number): string {

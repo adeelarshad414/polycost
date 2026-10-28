@@ -1,3 +1,10 @@
+import {
+  addUsd,
+  percentChange,
+  roundPercent,
+  roundUsd as roundCurrency,
+  sumUsd,
+} from '../money.js';
 import { createHash, createHmac, randomUUID } from 'node:crypto';
 import { Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
@@ -307,17 +314,13 @@ export class BillingService {
       ]);
     }
 
+    // Audit M-04: an exact micro-dollar sum, so the invoiced total does not
+    // depend on line-item order or drift with thousands of rows.
     const estimatedTotalUsd = roundCurrency(provider.totals.monthly);
-    const invoicedTotalUsd = roundCurrency(
-      lineItems.reduce((total, item) => total + item.costUsd, 0),
-    );
-    const varianceUsd = roundCurrency(invoicedTotalUsd - estimatedTotalUsd);
-    const variancePercent =
-      estimatedTotalUsd === 0
-        ? invoicedTotalUsd === 0
-          ? 0
-          : 100
-        : roundPercent((varianceUsd / estimatedTotalUsd) * 100);
+    const invoicedTotalUsd = roundCurrency(sumUsd(lineItems.map((item) => item.costUsd)));
+    const varianceUsd = roundCurrency(sumUsd([invoicedTotalUsd, -estimatedTotalUsd]));
+    // Null, not 100%, when there was no estimate: a change from zero has no percentage.
+    const variancePercent = percentChange(invoicedTotalUsd, estimatedTotalUsd);
     const status = reconciliationStatus(estimatedTotalUsd, variancePercent);
     const evidence = reconciliationEvidence(
       comparison.resultSnapshot,
@@ -3090,9 +3093,9 @@ function assertBillingAdmin(identity: AuthIdentity): void {
 
 function reconciliationStatus(
   estimatedTotalUsd: number,
-  variancePercent: number,
+  variancePercent: number | null,
 ): InvoiceReconciliationStatus {
-  if (estimatedTotalUsd === 0) {
+  if (estimatedTotalUsd === 0 || variancePercent === null) {
     return 'unmatched';
   }
 
@@ -3210,7 +3213,7 @@ function reconciliationEvidence(
     invoiceSourceMissingRecommendedFields: missingRecommendedFields,
     invoiceCoverage: {
       totalCostUsd: roundCurrency(
-        lineItems.reduce((total, lineItem) => total + lineItem.costUsd, 0),
+        lineItems.reduce((total, lineItem) => addUsd(total, lineItem.costUsd), 0),
       ),
       ...traceCoverage,
     },
@@ -3264,7 +3267,7 @@ function invoiceAdjustmentSummary(
     caveats: string[];
   };
   estimateComparableVarianceUsd: number;
-  estimateComparableVariancePercent: number;
+  estimateComparableVariancePercent: number | null;
   categories: Array<{
     category: InvoiceAdjustmentCategory;
     rowCount: number;
@@ -3312,14 +3315,14 @@ function invoiceAdjustmentSummary(
     };
 
     existing.rowCount += 1;
-    existing.totalCostUsd = roundCurrency(existing.totalCostUsd + lineItem.costUsd);
+    existing.totalCostUsd = addUsd(existing.totalCostUsd, lineItem.costUsd);
     existing.exampleServices.add(lineItem.serviceName);
     existing.reasons.add(classification.reason);
     categories.set(classification.category, existing);
 
     if (isCommitmentInvoiceCategory(classification.category)) {
       commitmentLineItemCount += 1;
-      commitmentNetCostUsd = roundCurrency(commitmentNetCostUsd + lineItem.costUsd);
+      commitmentNetCostUsd = addUsd(commitmentNetCostUsd, lineItem.costUsd);
     }
 
     if (classification.commitmentEvidence) {
@@ -3346,9 +3349,7 @@ function invoiceAdjustmentSummary(
         totalCostUsd: 0,
       };
       existingCommitment.rowCount += 1;
-      existingCommitment.totalCostUsd = roundCurrency(
-        existingCommitment.totalCostUsd + lineItem.costUsd,
-      );
+      existingCommitment.totalCostUsd = addUsd(existingCommitment.totalCostUsd, lineItem.costUsd);
       commitmentEvidenceCategories.set(commitmentKey, existingCommitment);
 
       for (const caveat of classification.commitmentEvidence.caveats) {
@@ -3358,44 +3359,44 @@ function invoiceAdjustmentSummary(
 
     if (!classification.isAdjustment) {
       usageLineItemCount += 1;
-      usageSubtotal = roundCurrency(usageSubtotal + lineItem.costUsd);
+      usageSubtotal = addUsd(usageSubtotal, lineItem.costUsd);
     } else {
       adjustmentLineItemCount += 1;
-      adjustmentSubtotal = roundCurrency(adjustmentSubtotal + lineItem.costUsd);
+      adjustmentSubtotal = addUsd(adjustmentSubtotal, lineItem.costUsd);
     }
   }
 
-  const estimateComparableVarianceUsd = roundCurrency(usageSubtotal - estimatedTotalUsd);
+  // The subtotals are exact micro-dollar sums; round each once, here.
+  const usageCostUsd = roundCurrency(usageSubtotal);
+  const estimateComparableVarianceUsd = roundCurrency(sumUsd([usageCostUsd, -estimatedTotalUsd]));
 
   return {
-    grossInvoiceTotalUsd: roundCurrency(usageSubtotal + adjustmentSubtotal),
-    estimateComparableUsageCostUsd: usageSubtotal,
-    adjustmentCostUsd: adjustmentSubtotal,
+    grossInvoiceTotalUsd: roundCurrency(addUsd(usageSubtotal, adjustmentSubtotal)),
+    estimateComparableUsageCostUsd: usageCostUsd,
+    adjustmentCostUsd: roundCurrency(adjustmentSubtotal),
     usageLineItemCount,
     adjustmentLineItemCount,
     commitmentLineItemCount,
-    commitmentNetCostUsd,
+    commitmentNetCostUsd: roundCurrency(commitmentNetCostUsd),
     commitmentEvidence: {
       status: commitmentLineItemCount > 0 ? 'provider-inventory-required' : 'not-applicable',
       rowsRequiringProviderInventory,
       rowsRequiringAmortizationPeriod,
       rowsRequiringAllocationEvidence,
-      categories: [...commitmentEvidenceCategories.values()].sort((left, right) => {
-        if (left.kind !== right.kind) {
-          return left.kind.localeCompare(right.kind);
-        }
+      categories: [...commitmentEvidenceCategories.values()]
+        .map((category) => ({ ...category, totalCostUsd: roundCurrency(category.totalCostUsd) }))
+        .sort((left, right) => {
+          if (left.kind !== right.kind) {
+            return left.kind.localeCompare(right.kind);
+          }
 
-        return left.treatment.localeCompare(right.treatment);
-      }),
+          return left.treatment.localeCompare(right.treatment);
+        }),
       caveats: [...commitmentEvidenceCaveatSet],
     },
     estimateComparableVarianceUsd,
-    estimateComparableVariancePercent:
-      estimatedTotalUsd === 0
-        ? usageSubtotal === 0
-          ? 0
-          : 100
-        : roundPercent((estimateComparableVarianceUsd / estimatedTotalUsd) * 100),
+    // Audit M-04: null, not 100%, when there was no estimate.
+    estimateComparableVariancePercent: percentChange(usageCostUsd, estimatedTotalUsd),
     categories: [...categories.entries()]
       .map(([category, summary]) => ({
         category,
@@ -5383,12 +5384,4 @@ function sha256(value: string): string {
 
 function sha256Buffer(value: Buffer): string {
   return createHash('sha256').update(value).digest('hex');
-}
-
-function roundCurrency(value: number): number {
-  return Math.round(value * 100) / 100;
-}
-
-function roundPercent(value: number): number {
-  return Math.round(value * 10_000) / 10_000;
 }

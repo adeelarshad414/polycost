@@ -1,3 +1,4 @@
+import { roundUsd as roundCurrency } from '../lib/money';
 import { FormEvent, useEffect, useMemo, useState } from 'react';
 import { formatApiError, polyCostClient, PolyCostClient } from '../api-client';
 import { Button } from './Button';
@@ -2638,10 +2639,6 @@ function formatPercent(value: number): string {
 function parseCurrencyInput(value: string): number | undefined {
   const parsed = Number.parseFloat(value.replace(/,/g, '').trim());
   return Number.isFinite(parsed) && parsed >= 0 ? parsed : undefined;
-}
-
-function roundCurrency(value: number): number {
-  return Math.round((value + Number.EPSILON) * 100) / 100;
 }
 
 function readDismissedAlerts(): string[] {

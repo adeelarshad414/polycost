@@ -181,7 +181,7 @@ say so explicitly rather than marking it done.
 | Audit remediation - Phase 0 (stop-the-bleed)            | Complete                             | 2026-10-02   |
 | Audit remediation - Phase UI-0 to UI-8 (Aurora)         | Complete                             | 2026-10-02   |
 | Audit remediation - Phase 1 (production foundations)    | Complete                             | 2026-10-05   |
-| Audit remediation - Phase 2 (correctness and tenancy)   | In progress (P2-1, H-05, H-01, H-10) | 2026-10-28   |
+| Audit remediation - Phase 2 (correctness and tenancy)   | In progress (5 of 8 done or partial) | 2026-10-28   |
 | Audit remediation - Phase 3 (architecture and scale)    | Not started                          | 2026-10-25   |
 
 ## Audit remediation programme (audit of 2026-09-30)
@@ -190,16 +190,16 @@ The roadmap is section 6 (and 9.5 / 11 for UI) of `polycost-audit-2026-09-30.md`
 kept outside this repository. This section is the current snapshot; it is rewritten
 in place as work lands, and the dated log below it is append-only.
 
-### Overall: about 50% by effort, 77% by work item (2026-10-28)
+### Overall: about 52% by effort, 80% by work item (2026-10-28)
 
-| Phase                               | Work items       |     Done | Effort (est.)   | Status                                                                            |
-| ----------------------------------- | ---------------- | -------: | --------------- | --------------------------------------------------------------------------------- |
-| 0 - Stop-the-bleed                  | 12 actions       |       12 | ~1 week         | ✅ Complete (#244, #249) - gate "safe to demo" met                                |
-| UI-0 to UI-8 - Aurora visual system | 9 phases         |        9 | ~7.5 weeks      | ✅ Complete (#236-#248)                                                           |
-| 1 - Production foundations          | 8 (P1-1 to P1-8) |        8 | ~4 weeks        | ✅ Complete (#250, #256-#263) - gate "safe to deploy" met in CI                   |
-| 2 - Correctness and tenancy         | 8 workstreams    |      3.5 | ~6 weeks        | 🟡 In progress - H-04, H-05, H-01 done; pricing truth half done (H-10); 4.5 to go |
-| 3 - Architecture and sustainability | 5 workstreams    |        0 | ~12 weeks       | ⬜ Not started                                                                    |
-| **Total**                           | **42**           | **32.5** | **~30.5 weeks** | **~50% of effort, 77% of items**                                                  |
+| Phase                               | Work items       |     Done | Effort (est.)   | Status                                                                                  |
+| ----------------------------------- | ---------------- | -------: | --------------- | --------------------------------------------------------------------------------------- |
+| 0 - Stop-the-bleed                  | 12 actions       |       12 | ~1 week         | ✅ Complete (#244, #249) - gate "safe to demo" met                                      |
+| UI-0 to UI-8 - Aurora visual system | 9 phases         |        9 | ~7.5 weeks      | ✅ Complete (#236-#248)                                                                 |
+| 1 - Production foundations          | 8 (P1-1 to P1-8) |        8 | ~4 weeks        | ✅ Complete (#250, #256-#263) - gate "safe to deploy" met in CI                         |
+| 2 - Correctness and tenancy         | 8 workstreams    |      4.5 | ~6 weeks        | 🟡 In progress - H-04, H-05, H-01, M-04 done; pricing truth half done (H-10); 3.5 to go |
+| 3 - Architecture and sustainability | 5 workstreams    |        0 | ~12 weeks       | ⬜ Not started                                                                          |
+| **Total**                           | **42**           | **33.5** | **~30.5 weeks** | **~52% of effort, 80% of items**                                                        |
 
 The two figures differ because the remaining phases are the large ones: Phase 2
 and 3 are 13 of the 42 items but about 18 of the 30.5 estimated weeks. Use the
@@ -250,6 +250,9 @@ effort figure for planning.
   one dated rate card served at `GET /pricing/rate-card`. The web app, engine and
   reports read it, and the web app holds no copy. CI fails on rates unreviewed for
   180 days. H-12 (calculator-captured golden set and the nightly proof) is next.
+- **Money (M-04)**: exact micro-dollar arithmetic with one rounding rule in both
+  apps, held to a shared case table. Billing sums are exact, and a $0 estimate no
+  longer produces a fake 100% variance (migration 047).
 - **Hygiene since then**: CodeQL triage, six findings fixed and the rest dismissed
   with reasons (#271); release images re-apply Alpine security fixes daily and zod
   4.6.7 (#281). Dependabot queue cleared on 2026-10-25: Actions bumps (#272, #274,
@@ -261,7 +264,7 @@ effort figure for planning.
 ### What next
 
 1. **Rest of Phase 2**, in roadmap order: pricing truth part 2 - calculator-captured
-   golden set and nightly accuracy proof (H-12; ADR-0002 needs acceptance), money as integer micro-dollars (M-04), Testcontainers
+   golden set and nightly accuracy proof (H-12; ADR-0002 needs acceptance), Testcontainers
    integration tests (H-11), zod-to-OpenAPI contracts (M-08), safe VSDX parsing
    (M-03).
 2. **Phase 3**: enterprise-module scope ADR, backend modularisation, frontend

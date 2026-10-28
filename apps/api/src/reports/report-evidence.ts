@@ -1,4 +1,5 @@
 /* eslint-disable security/detect-object-injection, security/detect-unsafe-regex -- Reviewed 2026-07-06: report dictionaries and bounded text cleanup operate on generated comparison/report data; see docs/SECURITY-SUPPRESSIONS.md. */
+import { addUsd, roundUsd as roundCurrency } from '../money.js';
 import type { ProviderId } from '../adapters/common/cloud-provider-adapter.js';
 import { MODELED_RATE_CARD } from '../pricing-models/modeled-rate-card.js';
 import { PricingModelCost } from '../adapters/common/cloud-provider-adapter.js';
@@ -2108,7 +2109,10 @@ function costCoverageMapRow(
   dimension: CostCoverageDimension,
 ): string[] {
   const matchingRows = provider.lineItems.filter((lineItem) => dimension.matches(lineItem));
-  const monthly = matchingRows.reduce((sum, lineItem) => sum + lineItem.baseMonthlyCostUsd, 0);
+  const monthly = matchingRows.reduce(
+    (sum, lineItem) => addUsd(sum, lineItem.baseMonthlyCostUsd),
+    0,
+  );
   const approximateRows = matchingRows.filter(
     (lineItem) => lineItem.isApproximate || lineItem.skuId?.startsWith('modeled-'),
   ).length;
@@ -2535,7 +2539,7 @@ function componentMonthly(
       (lineItem) =>
         (lineItem.costComponent ?? costComponentForCategory(lineItem.category)) === component,
     )
-    .reduce((sum, lineItem) => sum + lineItem.baseMonthlyCostUsd, 0);
+    .reduce((sum, lineItem) => addUsd(sum, lineItem.baseMonthlyCostUsd), 0);
 }
 
 function computeSpecificationOpportunityRows(result: ComparisonResult): string[][] {
@@ -3287,7 +3291,7 @@ function storageAnatomyOpportunityRows(result: ComparisonResult): string[][] {
     }
 
     const dimensions = storageAnatomyDimensions(rows);
-    const monthly = rows.reduce((sum, lineItem) => sum + lineItem.baseMonthlyCostUsd, 0);
+    const monthly = rows.reduce((sum, lineItem) => addUsd(sum, lineItem.baseMonthlyCostUsd), 0);
     const dimensionSummary = storageAnatomyDimensionSummary(dimensions);
     const action = storageAnatomyReportAction(dimensions, {
       databaseGrowthGb,
@@ -3694,7 +3698,7 @@ function databaseAnatomyOpportunityRows(result: ComparisonResult): string[][] {
     }
 
     const dimensions = databaseAnatomyDimensions(rows);
-    const monthly = rows.reduce((sum, lineItem) => sum + lineItem.baseMonthlyCostUsd, 0);
+    const monthly = rows.reduce((sum, lineItem) => addUsd(sum, lineItem.baseMonthlyCostUsd), 0);
     const action = databaseAnatomyReportAction(dimensions, {
       cacheReplicas,
       provisionedIops,
@@ -4139,7 +4143,7 @@ function appPlatformRequestLineMonthly(provider: ComparisonProviderResult): numb
   return roundCurrency(
     provider.lineItems
       .filter((lineItem) => lineItem.skuId?.startsWith('modeled-app-platform-request'))
-      .reduce((sum, lineItem) => sum + lineItem.baseMonthlyCostUsd, 0),
+      .reduce((sum, lineItem) => addUsd(sum, lineItem.baseMonthlyCostUsd), 0),
   );
 }
 
@@ -4814,9 +4818,5 @@ function tierBandLabel(tierFromGb: number, tierToGb?: number): string {
 }
 
 function formatNumber(value: number): string {
-  return (Math.round((value + Number.EPSILON) * 100) / 100).toString();
-}
-
-function roundCurrency(value: number): number {
-  return Math.round((value + Number.EPSILON) * 100) / 100;
+  return roundCurrency(value).toString();
 }

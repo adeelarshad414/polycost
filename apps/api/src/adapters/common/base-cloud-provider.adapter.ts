@@ -1,3 +1,4 @@
+import { addUsd, roundUsd } from '../../money.js';
 import { NWSValidator } from '../../nws/nws-validator.js';
 import { NormalizedWorkloadSpec } from '../../nws/nws.types.js';
 import {
@@ -193,7 +194,7 @@ export abstract class BaseCloudProviderAdapter implements CloudProviderAdapter {
     }
 
     const baseMonthlyCostUsd = this.roundCurrency(
-      lineItems.reduce((sum, item) => sum + item.baseMonthlyCostUsd, 0),
+      lineItems.reduce((sum, item) => addUsd(sum, item.baseMonthlyCostUsd), 0),
     );
     const baseHourlyCostUsd = this.roundRate(
       lineItems.reduce(
@@ -1064,7 +1065,7 @@ export abstract class BaseCloudProviderAdapter implements CloudProviderAdapter {
   }
 
   protected roundCurrency(value: number): number {
-    return Math.round((value + Number.EPSILON) * 100) / 100;
+    return roundUsd(value);
   }
 
   /**

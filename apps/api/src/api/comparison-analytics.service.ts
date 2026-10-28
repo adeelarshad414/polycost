@@ -1,4 +1,5 @@
 /* eslint-disable security/detect-object-injection -- Reviewed 2026-07-06: aggregation keys are typed provider/service/time buckets from comparison results; see docs/SECURITY-SUPPRESSIONS.md. */
+import { addUsd, roundUsd as roundCurrency } from '../money.js';
 import { Injectable } from '@nestjs/common';
 import { PricingModelKey, ProviderId } from '../adapters/common/cloud-provider-adapter.js';
 import {
@@ -439,7 +440,7 @@ function costComposition(
       return [];
     }
 
-    runningMonthlyUsd = roundCurrency(runningMonthlyUsd + amount.monthlyCostUsd);
+    runningMonthlyUsd = addUsd(runningMonthlyUsd, amount.monthlyCostUsd);
 
     return [
       {
@@ -616,7 +617,7 @@ function commitmentCoverage(result: ComparisonResult): CommitmentCoverageRow[] {
               model.monthlyCostUsd !== undefined,
           ),
         )
-        .reduce((sum, lineItem) => sum + lineItem.baseMonthlyCostUsd, 0),
+        .reduce((sum, lineItem) => addUsd(sum, lineItem.baseMonthlyCostUsd), 0),
     );
     const maxMonthlySavingsUsd = roundCurrency(
       provider.lineItems.reduce(
@@ -1068,10 +1069,6 @@ function percent(numerator: number, denominator: number): number {
 
 function clampPercent(value: number): number {
   return Math.min(100, Math.max(0, value));
-}
-
-function roundCurrency(value: number): number {
-  return Math.round((value + Number.EPSILON) * 100) / 100;
 }
 
 function formatNumber(value: number): string {

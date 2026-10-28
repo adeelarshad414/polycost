@@ -1603,6 +1603,78 @@ describe('BillingService', () => {
     expect(repository.getComparison).not.toHaveBeenCalled();
   });
 
+  // Audit M-04: exact totals, and no invented percentage against a $0 estimate.
+  it('sums invoice lines exactly and reports no variance percent without an estimate', async () => {
+    const repository = repositoryMock();
+    const importRunId = '55555555-5555-4555-8555-555555555555';
+    repository.getBillingImport.mockResolvedValue({
+      id: importRunId,
+      teamId: identity.teamId,
+      provider: 'aws',
+      sourceType: 'aws-cur',
+      status: 'completed',
+      billingPeriodStart: '2026-06-01',
+      billingPeriodEnd: '2026-06-30',
+      originalFileSha256: 'a'.repeat(64),
+      rowsReceived: 10,
+      rowsAccepted: 10,
+      rowsRejected: 0,
+      totalCostUsd: 1,
+      createdAt: '2026-07-06T00:00:00.000Z',
+    });
+    repository.listInvoiceLineItems.mockResolvedValue(
+      Array.from({ length: 10 }, (_, index) => ({
+        id: `line-${index}`,
+        importRunId,
+        teamId: identity.teamId,
+        provider: 'aws' as const,
+        billingPeriodStart: '2026-06-01',
+        billingPeriodEnd: '2026-06-30',
+        serviceName: 'AmazonEC2',
+        skuId: 'sku-compute',
+        region: 'us-east-1',
+        costUsd: 0.1,
+        currency: 'USD',
+        tags: {},
+        rawPayload: {},
+        lineItemHash: String(index).repeat(64).slice(0, 64),
+        createdAt: '2026-07-06T00:00:01.000Z',
+      })),
+    );
+    repository.getComparison.mockResolvedValue({
+      nwsSnapshot: {} as never,
+      resultSnapshot: {
+        ...comparisonResult,
+        providers: comparisonResult.providers.map((provider) =>
+          provider.providerId === 'aws'
+            ? { ...provider, totals: { ...provider.totals, monthly: 0 } }
+            : provider,
+        ),
+      },
+    });
+    repository.saveInvoiceReconciliation.mockImplementation(async (input) => ({
+      id: '66666666-6666-4666-8666-666666666666',
+      createdAt: '2026-07-06T00:00:02.000Z',
+      evidenceHash: 'a'.repeat(32),
+      ...input,
+    }));
+
+    const result = await new BillingService(repository as never).reconcile(
+      importRunId,
+      { comparisonId: comparisonResult.comparisonId },
+      identity,
+    );
+
+    // Ten floating-point 0.1s add up to 0.9999999999999999; the total is $1.00.
+    expect(result).toMatchObject({
+      estimatedTotalUsd: 0,
+      invoicedTotalUsd: 1,
+      varianceUsd: 1,
+      variancePercent: null,
+      status: 'unmatched',
+    });
+  });
+
   it('reconciles imported actuals against comparison totals with trace evidence', async () => {
     const repository = repositoryMock();
     repository.getBillingImport.mockResolvedValue({

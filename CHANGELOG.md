@@ -82,6 +82,20 @@ once tagged releases begin.
 
 ### Added
 
+- Exact money arithmetic (audit M-04). One money module per app
+  (`apps/api/src/money.ts`, `apps/web/src/lib/money.ts`) replaces about fifteen
+  hand-rolled rounding helpers that disagreed (billing's skipped the epsilon
+  nudge). Amounts move to whole micro-dollars before adding or rounding, so sums no
+  longer drift: ten line items of $0.10 now total $1.00, not $0.9999999999999999.
+  Rounding is half away from zero, so $1.005 becomes $1.01; the old helper gave $1.00.
+  Billing totals, subtotals and the engine's line-item sums use exact addition and
+  round once. Both copies run the shared case table in
+  `packages/types/money-cases.json`. A test fails if the copies differ, or if a
+  hand-rolled cent-rounding helper reappears anywhere in either app.
+- Reconciliation against a $0 estimate no longer reports a 100% variance, a figure
+  nobody measured. `variancePercent` and `estimateComparableVariancePercent` are
+  null in that case, and the status stays `unmatched`. Migration 047 makes the
+  column nullable and corrects existing rows; the workspace shows "—".
 - One modeled rate card (ADR-0002, audit H-10). Every rate that approximates a
   pricing model rather than a single SKU now lives in
   `apps/api/src/pricing-models/modeled-rate-card.ts`, with a `source` and `reviewedAt`

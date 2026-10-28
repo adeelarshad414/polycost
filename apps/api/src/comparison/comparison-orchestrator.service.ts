@@ -1,4 +1,5 @@
 /* eslint-disable security/detect-object-injection -- Reviewed 2026-07-06: comparison maps use typed provider/service/region keys derived from validated NWS input; see docs/SECURITY-SUPPRESSIONS.md. */
+import { addUsd, roundUsd } from '../money.js';
 import {
   MODELED_RATE_CARD,
   type AiServicesRates,
@@ -213,7 +214,7 @@ export class ComparisonOrchestratorService {
     ].map((lineItem) => this.withPricingTrace(result.providerId, lineItem));
 
     const monthlyCostUsd = this.roundCurrency(
-      lineItems.reduce((sum, lineItem) => sum + lineItem.baseMonthlyCostUsd, 0),
+      lineItems.reduce((sum, lineItem) => addUsd(sum, lineItem.baseMonthlyCostUsd), 0),
     );
     const hourlyCostUsd = this.roundCurrency(
       lineItems.reduce(
@@ -293,7 +294,7 @@ export class ComparisonOrchestratorService {
 
     const nonComputeMonthlyCostUsd = lineItems
       .filter((lineItem) => lineItem.costComponent !== 'compute')
-      .reduce((sum, lineItem) => sum + lineItem.baseMonthlyCostUsd, 0);
+      .reduce((sum, lineItem) => addUsd(sum, lineItem.baseMonthlyCostUsd), 0);
     const computeMonthlyCostUsd = commitmentCosts.reduce(
       (sum, model) => sum + (model?.monthlyCostUsd ?? 0),
       0,
@@ -649,7 +650,10 @@ export class ComparisonOrchestratorService {
       return undefined;
     }
 
-    const subtotal = lineItems.reduce((sum, lineItem) => sum + lineItem.baseMonthlyCostUsd, 0);
+    const subtotal = lineItems.reduce(
+      (sum, lineItem) => addUsd(sum, lineItem.baseMonthlyCostUsd),
+      0,
+    );
     const supportCost = this.supportCost(providerId, supportTier, subtotal);
 
     if (supportCost <= 0) {
@@ -1059,7 +1063,7 @@ export class ComparisonOrchestratorService {
       .filter((lineItem) =>
         ['database', 'storage', 'egress'].includes(this.lineItemComponent(lineItem)),
       )
-      .reduce((sum, lineItem) => sum + lineItem.baseMonthlyCostUsd, 0);
+      .reduce((sum, lineItem) => addUsd(sum, lineItem.baseMonthlyCostUsd), 0);
     const monthlyCostUsd = this.roundCurrency(
       statefulSubtotal * resilienceStatefulOverheadFactor(faultTolerance),
     );
@@ -1959,7 +1963,7 @@ export class ComparisonOrchestratorService {
     const databaseBaseMonthlyCostUsd =
       lineItems
         .filter((lineItem) => this.lineItemComponent(lineItem) === 'database')
-        .reduce((sum, lineItem) => sum + lineItem.baseMonthlyCostUsd, 0) /
+        .reduce((sum, lineItem) => addUsd(sum, lineItem.baseMonthlyCostUsd), 0) /
       databaseComponents.length;
     const representativeBaseCost = Number.isFinite(databaseBaseMonthlyCostUsd)
       ? databaseBaseMonthlyCostUsd
@@ -3161,7 +3165,7 @@ export class ComparisonOrchestratorService {
     return this.roundCurrency(
       lineItems
         .filter((lineItem) => this.lineItemComponent(lineItem) === component)
-        .reduce((sum, lineItem) => sum + lineItem.baseMonthlyCostUsd, 0),
+        .reduce((sum, lineItem) => addUsd(sum, lineItem.baseMonthlyCostUsd), 0),
     );
   }
 
@@ -3600,7 +3604,7 @@ export class ComparisonOrchestratorService {
   }
 
   private roundCurrency(value: number): number {
-    return Math.round((value + Number.EPSILON) * 100) / 100;
+    return roundUsd(value);
   }
 
   private savingsPercent(candidateMonthlyCostUsd: number, onDemandMonthlyCostUsd: number): number {
@@ -4072,7 +4076,7 @@ function noSqlProvisionedCapacityScenario(input: {
 }
 
 function roundModeledCurrency(value: number): number {
-  return Math.round((value + Number.EPSILON) * 100) / 100;
+  return roundUsd(value);
 }
 
 function sqlServerLicenseRate(providerId: ProviderId): number {
