@@ -1,4 +1,6 @@
 /* eslint-disable security/detect-object-injection, security/detect-unsafe-regex -- Reviewed 2026-07-06: report dictionaries and bounded text cleanup operate on generated comparison/report data; see docs/SECURITY-SUPPRESSIONS.md. */
+import type { ProviderId } from '../adapters/common/cloud-provider-adapter.js';
+import { MODELED_RATE_CARD } from '../pricing-models/modeled-rate-card.js';
 import { PricingModelCost } from '../adapters/common/cloud-provider-adapter.js';
 import {
   ComparisonLineItem,
@@ -55,19 +57,6 @@ interface RankedProviderScenario extends ProviderScenario {
   annualAvoidableSpendUsd?: number;
 }
 
-interface AppPlatformModelRates {
-  requestPerMillion: number;
-  vcpuHour: number;
-  memoryGbHour: number;
-  alwaysOnVcpuHour: number;
-  alwaysOnMemoryGbHour: number;
-}
-
-interface ServerlessFunctionRates {
-  requestPerMillion: number;
-  gbSecond: number;
-}
-
 interface ComputeSpecEvidenceProfile {
   x86Family: string;
   armFamily: string;
@@ -88,57 +77,6 @@ interface CostCoverageDimension {
   matches(lineItem: ComparisonLineItem): boolean;
   configured?(result: ComparisonResult): boolean;
 }
-
-const APP_PLATFORM_MODEL_RATES: Record<
-  ComparisonProviderResult['providerId'],
-  AppPlatformModelRates
-> = {
-  aws: {
-    requestPerMillion: 0,
-    vcpuHour: 0.064,
-    memoryGbHour: 0.007,
-    alwaysOnVcpuHour: 0.064,
-    alwaysOnMemoryGbHour: 0.007,
-  },
-  azure: {
-    requestPerMillion: 0.4,
-    vcpuHour: 0.0864,
-    memoryGbHour: 0.009,
-    alwaysOnVcpuHour: 0.095,
-    alwaysOnMemoryGbHour: 0.012,
-  },
-  gcp: {
-    requestPerMillion: 0.4,
-    vcpuHour: 0.0864,
-    memoryGbHour: 0.009,
-    alwaysOnVcpuHour: 0.0648,
-    alwaysOnMemoryGbHour: 0.00675,
-  },
-};
-
-const SERVERLESS_FUNCTION_RATES: Record<
-  ComparisonProviderResult['providerId'],
-  ServerlessFunctionRates
-> = {
-  aws: {
-    requestPerMillion: 0.2,
-    gbSecond: 0.0000166667,
-  },
-  azure: {
-    requestPerMillion: 0.2,
-    gbSecond: 0.000016,
-  },
-  gcp: {
-    requestPerMillion: 0.4,
-    gbSecond: 0.0000025,
-  },
-};
-
-const COMPUTE_ARM_COST_FACTORS: Record<ComparisonProviderResult['providerId'], number> = {
-  aws: 0.8,
-  azure: 0.85,
-  gcp: 0.82,
-};
 
 const COMPUTE_SPEC_EVIDENCE: Record<
   ComputeSpecTier,
@@ -2752,7 +2690,7 @@ function computeArchitectureMonthlyDelta(
     return 0;
   }
 
-  const armFactor = COMPUTE_ARM_COST_FACTORS[providerId];
+  const armFactor = MODELED_RATE_CARD.computeArmCostFactors.rates[providerId as ProviderId];
 
   if (architecture === 'arm64') {
     return roundCurrency(Math.max(0, computeMonthly / armFactor - computeMonthly));
@@ -4187,7 +4125,7 @@ function serverlessFunctionMonthly(
     requestsMillion: number;
   },
 ): number {
-  const rates = SERVERLESS_FUNCTION_RATES[providerId];
+  const rates = MODELED_RATE_CARD.serverlessFunctions.rates[providerId as ProviderId];
   const invocations = input.requestsMillion * 1_000_000;
   const durationSeconds = input.durationMs / 1000;
   const memoryGb = input.memoryMb / 1024;
@@ -4214,7 +4152,7 @@ function appPlatformRequestMonthly(
     vcpu: number;
   },
 ): number {
-  const rates = APP_PLATFORM_MODEL_RATES[providerId];
+  const rates = MODELED_RATE_CARD.appPlatform.rates[providerId as ProviderId];
   const activeHours = (input.requestsMillion * 1_000_000 * (input.durationMs / 1000)) / 3600;
   const requestCost = input.requestsMillion * rates.requestPerMillion;
   const computeCost = activeHours * input.vcpu * rates.vcpuHour;
@@ -4232,7 +4170,7 @@ function appPlatformAlwaysOnMonthly(
     vcpu: number;
   },
 ): number {
-  const rates = APP_PLATFORM_MODEL_RATES[providerId];
+  const rates = MODELED_RATE_CARD.appPlatform.rates[providerId as ProviderId];
   const instanceHours = Math.max(0, input.alwaysOnHours) * Math.max(0, input.minInstances);
 
   return roundCurrency(
@@ -4821,29 +4759,12 @@ function providerRegionLabel(providerId: string, comparisonRegion: string): stri
   return comparisonRegion;
 }
 
+// ADR-0002: from the rate card, the same multipliers the web app shows.
 function regionVarianceMultiplier(region: string): number {
-  switch (region) {
-    case 'us-east':
-      return 1;
-    case 'us-central':
-      return 0.99;
-    case 'us-west':
-      return 1.03;
-    case 'canada':
-      return 1.04;
-    case 'eu-west':
-      return 1.08;
-    case 'eu-central':
-      return 1.09;
-    case 'uk':
-      return 1.1;
-    case 'ap-south':
-      return 0.96;
-    case 'ap-southeast':
-      return 1.12;
-    default:
-      return 1;
-  }
+  return (
+    MODELED_RATE_CARD.regionVariance.rates.find((profile) => profile.regionId === region)
+      ?.multiplier ?? 1
+  );
 }
 
 function regionVarianceEvidence(region: string): string {

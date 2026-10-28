@@ -2,7 +2,8 @@ import React, { act } from 'react';
 import { flushSync } from 'react-dom';
 import { createRoot, Root } from 'react-dom/client';
 import { App, ComparisonView, ScrollProgressBar } from './App';
-import { PolyCostClient, PolyCostApiError } from './api-client';
+import { PolyCostClient, PolyCostApiError, polyCostClient } from './api-client';
+import { RATE_CARD_FIXTURE } from './lib/rate-card.test-fixture';
 import { writeKeys } from './lib/write-keys';
 import {
   BackendHealthResponse,
@@ -2557,6 +2558,12 @@ describe('ComparisonView', () => {
   beforeEach(() => {
     window.localStorage.removeItem('polycost-persona-view');
     window.localStorage.removeItem('polycost-dismissed-budget-alerts');
+    // ADR-0002: modeled figures come from the API rate card; serve the fixture.
+    jest.spyOn(polyCostClient, 'getRateCard').mockResolvedValue(RATE_CARD_FIXTURE);
+  });
+
+  afterEach(() => {
+    jest.restoreAllMocks();
   });
 
   afterEach(() => {
@@ -4640,6 +4647,7 @@ function clientMock(overrides: Partial<PolyCostClient> = {}): PolyCostClient {
     createComparison: jest.fn(async () => comparisonResult),
     generateTerraform: jest.fn(async () => terraformBundle),
     getComparison: jest.fn(async () => comparisonResult),
+    getRateCard: jest.fn(async () => RATE_CARD_FIXTURE),
     getComparisonOwnership: jest.fn(async () => anonymousOwnership),
     listTeamDomains: jest.fn(async () => []),
     addTeamDomain: jest.fn(),

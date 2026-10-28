@@ -57,6 +57,19 @@ describe('PricingModelsController', () => {
     expect(response.header).toHaveBeenCalledWith('X-RateLimit-Remaining', '1');
   });
 
+  // ADR-0002: the one copy of the modeled rates, served with its dates.
+  it('serves the modeled rate card with its oldest review date', async () => {
+    const controller = pricingModelsController();
+    const response = responseHeaders();
+
+    const card = await controller.rateCard({ ip: '127.0.0.1' }, response);
+
+    expect(card.kind).toBe('modeled');
+    expect(card.pricingAsOf).toMatch(/^\d{4}-\d{2}-\d{2}$/);
+    expect(card.serverlessFunctions.rates.aws.gbSecond).toBeGreaterThan(0);
+    expect(card.interRegionTransfer.rates.gcp.routes['us-central->us-east']).toBe(0.01);
+  });
+
   it('lists dynamic model/payment options for selector-driven UIs', async () => {
     const controller = pricingModelsController();
     const response = responseHeaders();

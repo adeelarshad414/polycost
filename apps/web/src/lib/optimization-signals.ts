@@ -9,21 +9,17 @@
 import { HOURS_PER_MONTH, intervalMultiplierFromMonthly } from '../cost-time';
 import { COOKIE_SESSION } from './session';
 import {
-  APP_PLATFORM_MODEL_RATES,
   AUTH_SESSION_EXPIRES_AT_STORAGE_KEY,
   AUTH_SESSION_STORAGE_KEY,
   COMPARISON_HISTORY_STORAGE_KEY,
-  COMPUTE_ARM_COST_FACTORS,
   COMPUTE_STORAGE_DEFAULTS,
   DIAGRAM_REVIEW_SERVICE_OPTIONS,
   INPUT_MODE_OPTIONS,
   PRICING_MODEL_OPTIONS,
   PRICING_MODEL_STORAGE_KEY,
-  REGION_VARIANCE_PROFILES,
   REQUIREMENTS_FILE_EXTENSIONS,
   REQUIREMENTS_FILE_MIME_TYPES,
   REQUIREMENT_SESSION_STORAGE_KEY,
-  SERVERLESS_FUNCTION_RATES,
   SERVICE_CATEGORIES,
   SERVICE_FAMILY_ALIASES,
   SPOT_ESTIMATE_TOOLTIP,
@@ -117,6 +113,7 @@ import {
   DataHealthResponse,
   DiagramParseResult,
   IntervalKey,
+  ModeledRateCard,
   PROVIDER_ORDER,
   PricingModelKey,
   ProviderId,
@@ -483,12 +480,16 @@ export function computeArchitectureDelta(
   providerId: ProviderId,
   computeMonthly: number,
   architecture: WorkloadFormState['processorArchitecture'],
+  rateCard: ModeledRateCard | null,
 ): string {
   if (architecture === 'gpu') {
     return 'GPU/CUDA validation: compare accelerator type, quota, and data-staging cost.';
   }
 
-  const armFactor = COMPUTE_ARM_COST_FACTORS[providerId];
+  const armFactor = rateCard?.computeArmCostFactors.rates[providerId];
+  if (armFactor === undefined) {
+    return 'ARM vs x86: modeled rates are not available right now.';
+  }
 
   if (architecture === 'arm64') {
     const x86Equivalent = computeMonthly / armFactor;
@@ -848,8 +849,9 @@ export function serverlessFunctionMonthly(
     durationMs: number;
     memoryMb: number;
   },
+  rateCard: ModeledRateCard,
 ): number {
-  const rates = SERVERLESS_FUNCTION_RATES[providerId];
+  const rates = rateCard.serverlessFunctions.rates[providerId];
   const invocations = input.requestsMillion * 1_000_000;
   const durationSeconds = input.durationMs / 1000;
   const memoryGb = input.memoryMb / 1024;
@@ -867,8 +869,9 @@ export function appPlatformRequestMonthly(
     requestsMillion: number;
     vcpu: number;
   },
+  rateCard: ModeledRateCard,
 ): number {
-  const rates = APP_PLATFORM_MODEL_RATES[providerId];
+  const rates = rateCard.appPlatform.rates[providerId];
   const activeHours = (input.requestsMillion * 1_000_000 * (input.durationMs / 1000)) / 3600;
   const requestCost = input.requestsMillion * rates.requestPerMillion;
   const computeCost = activeHours * input.vcpu * rates.vcpuHour;
@@ -885,8 +888,9 @@ export function appPlatformAlwaysOnMonthly(
     minInstances: number;
     vcpu: number;
   },
+  rateCard: ModeledRateCard,
 ): number {
-  const rates = APP_PLATFORM_MODEL_RATES[providerId];
+  const rates = rateCard.appPlatform.rates[providerId];
   const instanceHours = Math.max(0, input.alwaysOnHours) * Math.max(0, input.minInstances);
 
   return roundCurrency(
@@ -1011,7 +1015,8 @@ export function operationsOptimizationRows(
 export function regionVarianceRows(
   comparison: ComparisonResult | null,
   form: WorkloadFormState,
-  serverRows?: ComparisonAnalyticsResponse['regionVarianceHeatMap'],
+  serverRows: ComparisonAnalyticsResponse['regionVarianceHeatMap'] | undefined,
+  rateCard: ModeledRateCard | null,
 ): RegionVarianceRow[] {
   if (serverRows && serverRows.length > 0) {
     return serverRows.map((row) => ({
@@ -1032,7 +1037,7 @@ export function regionVarianceRows(
     }));
   }
 
-  if (!comparison || comparison.providers.length === 0) {
+  if (!comparison || comparison.providers.length === 0 || !rateCard) {
     return [];
   }
 
@@ -1041,7 +1046,7 @@ export function regionVarianceRows(
     form.complianceLocked && form.dataResidency
       ? canonicalRegionsForResidencyScope(form.dataResidency)
       : undefined;
-  const visibleProfiles = REGION_VARIANCE_PROFILES.filter(
+  const visibleProfiles = rateCard.regionVariance.rates.filter(
     (profile) => !allowedRegions || allowedRegions.includes(profile.regionId),
   );
 

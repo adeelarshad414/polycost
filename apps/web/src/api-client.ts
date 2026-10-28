@@ -8,6 +8,7 @@ import {
 import { writeKeyHeaders, writeKeys } from './lib/write-keys';
 import {
   ApiErrorDetail,
+  ModeledRateCard,
   TeamDomainRecord,
   ResourceOwnership,
   TeamComparisonSummary,
@@ -254,6 +255,8 @@ export interface PolyCostClient {
     region: string,
   ): Promise<PricingModelsForServiceResponse>;
   getRegionCatalog(): Promise<RegionCatalogResponse>;
+  /** ADR-0002: modeled rates with their review dates; the web app keeps no copy. */
+  getRateCard(): Promise<ModeledRateCard>;
   createWorkload(input: WorkloadInput): Promise<WorkloadRecord>;
   createShareLink(input: {
     workloadId: string;
@@ -804,6 +807,9 @@ export function createPolyCostClient(baseUrl = configuredApiBaseUrl()): PolyCost
           service,
         )}/models?region=${encodeURIComponent(region)}`,
       );
+    },
+    getRateCard() {
+      return requestJson<ModeledRateCard>(baseUrl, '/pricing/rate-card');
     },
     getRegionCatalog() {
       return requestJson<RegionCatalogResponse>(baseUrl, '/regions');

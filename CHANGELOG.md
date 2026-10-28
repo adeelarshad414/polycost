@@ -82,6 +82,20 @@ once tagged releases begin.
 
 ### Added
 
+- One modeled rate card (ADR-0002, audit H-10). Every rate that approximates a
+  pricing model rather than a single SKU now lives in
+  `apps/api/src/pricing-models/modeled-rate-card.ts`, with a `source` and `reviewedAt`
+  per group. That covers app platforms, functions, Kubernetes, registries, storage,
+  database, supporting services, analytics, AI, integration, network, ARM ratios,
+  regional premiums, inter-region transfer and burstable credits. They were
+  previously hard-coded in four places: the web catalogs, two spots in the comparison
+  engine, and the report evidence module. The engine and reports import the card;
+  `GET /pricing/rate-card` serves it with `pricingAsOf`; the web app keeps no copy
+  and hides modeled figures when the card is unavailable rather than falling back. The
+  analytics section says when the modeled rates were last reviewed. A unit test fails
+  once any group goes 180 days unreviewed, and another fails if a rate constant
+  returns to the web catalogs. Prices are unchanged: the honest review dates are the
+  dates the rates were added (2026-07-01 to 07-04).
 - The tenancy UI, ADR-0001 step 4 part 2 (P2-1d). The results page shows ownership:
   the team name and the caller's role, or "Anonymous" with a countdown to its expiry.
   Anonymous comparisons offer Copy edit key (it falls back to showing the key when

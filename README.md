@@ -262,6 +262,12 @@ The main API is versioned under `/api/v1`.
 - `POST /workload/validate` validates workload input.
 - `POST /parse/diagram` parses Mermaid, draw.io XML, Lucid CSV, or VSDX into a reviewable NWS draft.
 - `GET /pricing/coverage` reports live-catalog versus modeled pricing coverage without claiming invoice-grade support.
+- `GET /pricing/rate-card` returns the modeled rate card ([ADR-0002](docs/decisions/ADR-0002-pricing-truth.md)):
+  every rate that approximates a pricing model rather than a single SKU (app platforms,
+  functions, Kubernetes, storage and database dimensions, network, ARM ratios, regional
+  premiums, inter-region transfer), each with its source and the date it was last
+  checked. It is the only copy: the engine and the web app both read it, and CI fails
+  when a group goes 180 days without review.
 - `GET /pricing/status` returns pricing catalog status.
 - `GET /pricing/compare` compares cached pricing for a workload.
 - `GET /pricing/breakdown` returns detailed workload pricing breakdowns.
