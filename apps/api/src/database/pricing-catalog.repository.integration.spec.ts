@@ -99,11 +99,9 @@ describe('PostgresPricingCatalogRepository (integration)', () => {
     });
   });
 
-  // KNOWN-ISSUES K-14: pricing_catalog.unit_price_usd is NUMERIC(14, 6), so a
-  // price below half a micro-dollar per unit is stored as 0. Expected to fail
-  // until the column is widened; Jest then reports this test, and `.failing`
-  // comes off.
-  it.failing('keeps unit prices finer than a micro-dollar (K-14)', async () => {
+  // KNOWN-ISSUES K-14: unit_price_usd was NUMERIC(14, 6), which stored a price
+  // below half a micro-dollar per unit as 0. Migration 049 widened it.
+  it('keeps unit prices finer than a micro-dollar (K-14)', async () => {
     expect((await readBack(0.0000002)).unitPriceUsd).toBe(0.0000002);
   });
 

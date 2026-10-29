@@ -24,9 +24,9 @@
 | 🟢  | K-11 · majors blocked behind ESM                 | resolved — only #168 remains, blocked by ts-jest |
 | 🟢  | K-12 · `impeccable` skips on CI's Node           | fixed — CI on Node 24, gate enforced             |
 | 🟢  | K-13 · Redis persistence disabled                | fixed                                            |
-| 🟡  | K-14 · catalog prices below $0.0000005 read as 0 | open — needs a column-widening migration         |
+| 🟢  | K-14 · catalog prices below $0.0000005 read as 0 | fixed — column widened (migration 049)           |
 
-**One entry is open: K-14.** Every other entry is fixed or accepted. K-5 and K-6 stay accepted
+**No entry is open.** Every entry is fixed or accepted. K-5 and K-6 stay accepted
 rather than fixed: both are warnings with zero errors and no failing test, and
 the rationale is recorded with each.
 
@@ -572,11 +572,11 @@ and job name are sent, because job data carries workload and tenant details.
 > would lose scheduled work with no trace, and the metric that exposed it only
 > existed for a day.
 
-## 🟡 K-14 · Catalog unit prices finer than a micro-dollar are stored as 0
+## 🟢 K-14 · ~~Catalog unit prices finer than a micro-dollar are stored as 0~~
 
 |            |                                                            |
 | ---------- | ---------------------------------------------------------- |
-| **Status** | 🟡 Open                                                    |
+| **Status** | 🟢 Fixed 2026-10-29 (migration 049)                        |
 | **Found**  | 2026-10-29, by the first Postgres integration tests (H-11) |
 
 `pricing_catalog.unit_price_usd` is `NUMERIC(14, 6)` (migration 001). Postgres
@@ -591,15 +591,23 @@ The code around it already expects more: normalized prices keep eight decimals
 catalog truncates.
 
 **Reproduced by** `pricing-catalog.repository.integration.spec.ts`: the test
-"keeps unit prices finer than a micro-dollar (K-14)" is marked `it.failing`, so CI
-stays green while it fails and goes red the day the column is fixed, so the
-marker gets removed.
+"keeps unit prices finer than a micro-dollar (K-14)" was marked `it.failing` until
+the fix, and is now an ordinary test.
 
-**Fix:** widen the column (for example to `NUMERIC(20, 10)`). Changing the scale
-rewrites `pricing_catalog` under an exclusive lock, so under the migration lock
-rules (audit H-09) this needs either the add-column-and-backfill pattern or a
-reviewed `migrate:allow-lock` opt-out with the table size at the time. Then
-re-run a live refresh so the affected SKUs get their real prices.
+**Fixed by** migration 049, which widens the column to `NUMERIC(20, 10)`, wider
+than the normalized tables, so the raw catalog is never the column that rounds.
+Changing the scale rewrites `pricing_catalog` under an exclusive lock, so the
+migration carries a reviewed `migrate:allow-lock` opt-out (audit H-09) instead of
+add-column-and-backfill. The table is ETL-owned and rebuilt by every refresh, the
+app only reads it, and rewriting its tens of thousands of rows takes seconds. An
+in-place type change also keeps the column's CHECK, the unique key, the indexes
+and the role grants as they were; a column swap would have had to recreate them.
+A `lock_timeout` of 5s makes it fail fast rather than queue behind a long read.
+The read path needed no change: `Number.parseFloat` reads `0.0000002000` as
+`2e-7`, and the upsert passes prices through an unconstrained `NUMERIC`.
+
+**Owner action:** after `npm run db:migrate`, run a live refresh so SKUs stored
+as 0 (or with lost digits) get their real prices back.
 
 ## 🔵 Incomplete by design
 

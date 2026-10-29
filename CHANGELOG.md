@@ -221,6 +221,11 @@ once tagged releases begin.
 
 ### Fixed
 
+- Catalog unit prices below $0.0000005 were stored as 0, and finer prices lost
+  digits: `pricing_catalog.unit_price_usd` was `NUMERIC(14, 6)`. Migration 049
+  widens it to `NUMERIC(20, 10)`, keeping its constraints, indexes and grants
+  (KNOWN-ISSUES K-14, found by H-11). Per-request prices such as AWS Lambda's
+  $0.0000002 now survive. Run a live refresh after migrating to restore them.
 - The API's database role was missing grants that three features depend on, each
   a "permission denied" in production that mocked unit tests could not see
   (found by H-11, migration 048): claiming an anonymous comparison into a team,

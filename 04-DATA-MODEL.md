@@ -119,7 +119,7 @@ CREATE TABLE pricing_catalog (
     sku_description  TEXT,
     region           VARCHAR(50) NOT NULL,
     unit             VARCHAR(50) NOT NULL,
-    unit_price_usd   NUMERIC(14, 6) NOT NULL,
+    unit_price_usd   NUMERIC(20, 10) NOT NULL,  -- widened from (14, 6) in 049 (K-14)
     attributes       JSONB,
     effective_date   TIMESTAMP NOT NULL,
     fetched_at       TIMESTAMP NOT NULL DEFAULT now(),
