@@ -165,7 +165,7 @@ Rollback means redeploying the previous release's chart version: its digests are
 - Run `npm run ci:unit` to execute coverage and the pricing-logic coverage gate.
 - If coverage was run manually, run `npm run pricing:logic:coverage` after
   `npm run test:coverage`.
-- Run `npm run ci:integration`.
+- Run `npm run ci:integration` (needs Docker: it starts a throwaway Postgres 16).
 - Run `npm run ci:build`.
 - Run `npm run ci:e2e`.
 - Run `npm run provider:credentials:check`.

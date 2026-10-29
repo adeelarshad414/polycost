@@ -9,8 +9,8 @@
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "test": "npm run test:unit",
     "test:unit": "NODE_OPTIONS=--experimental-vm-modules jest --config jest.config.cjs --testPathIgnorePatterns \"\\.integration\\.spec\\.ts$\" --testPathIgnorePatterns \"\\.e2e\\.spec\\.ts$\"",
-    "test:integration": "NODE_OPTIONS=--experimental-vm-modules jest --config jest.config.cjs --runInBand --testMatch \"**/*.integration.spec.ts\" --passWithNoTests",
-    "test:e2e": "NODE_OPTIONS=--experimental-vm-modules jest --config jest.config.cjs --runInBand --testMatch \"**/*.e2e.spec.ts\" --passWithNoTests",
+    "test:integration": "NODE_OPTIONS=--experimental-vm-modules jest --config jest.config.cjs --runInBand --testMatch \"**/*.integration.spec.ts\"",
+    "test:e2e": "NODE_OPTIONS=--experimental-vm-modules jest --config jest.config.cjs --runInBand --testMatch \"**/*.e2e.spec.ts\"",
     "test:coverage": "NODE_OPTIONS=--experimental-vm-modules jest --config jest.config.cjs --coverage --testPathIgnorePatterns \"\\.integration\\.spec\\.ts$\" --testPathIgnorePatterns \"\\.e2e\\.spec\\.ts$\"",
     "start:dev": "node --import tsx ./src/main.ts",
     "start:prod": "node --import ./otel-register.mjs dist/main.js"
@@ -46,7 +46,9 @@
   },
   "devDependencies": {
     "@opentelemetry/context-async-hooks": "^2.11.0",
+    "@testcontainers/postgresql": "^12.2.1",
     "@types/pg": "^8.20.0",
+    "testcontainers": "^12.2.1",
     "ts-node": "^10.9.2"
   }
 }

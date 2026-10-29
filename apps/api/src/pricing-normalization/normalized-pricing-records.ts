@@ -666,9 +666,10 @@ function maxIso(left: string, right: string): string {
   return left > right ? left : right;
 }
 
-// Catalog unit prices keep 8 decimals: some SKUs cost fractions of a
+// Normalized unit prices keep 8 decimals: some SKUs cost fractions of a
 // micro-dollar per unit, finer than money.ts (micro-dollars) can hold. Totals
-// built from these prices are rounded with money.ts (audit M-04).
+// built from these prices are rounded with money.ts (audit M-04). The raw
+// pricing_catalog column still stores only 6 (KNOWN-ISSUES K-14).
 function roundCurrency(value: number): number {
   return Math.round((value + Number.EPSILON) * 100_000_000) / 100_000_000;
 }

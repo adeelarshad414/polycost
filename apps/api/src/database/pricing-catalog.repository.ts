@@ -361,6 +361,8 @@ export class PostgresPricingCatalogRepository
     // same snapshot, and the delete only happens when this run refreshed at
     // least minFreshRatio of the live catalog. A truncated provider response
     // that still parses cleanly would otherwise delete most of the catalog.
+    // $3 is cast: next to count(*) Postgres infers bigint, so a ratio such as
+    // 0.9 was rejected and every live refresh ended 'failed' (found by H-11).
     const result = await pool.query<{ fresh: string; stale: string; pruned: string }>(
       `
         WITH live AS (
@@ -377,7 +379,7 @@ export class PostgresPricingCatalogRepository
             AND source_endpoint LIKE 'https://%'
             AND fetched_at < $2
             AND (SELECT fresh FROM live) > 0
-            AND (SELECT fresh FROM live) >= $3 * ((SELECT fresh FROM live) + (SELECT stale FROM live))
+            AND (SELECT fresh FROM live) >= $3::numeric * ((SELECT fresh FROM live) + (SELECT stale FROM live))
           RETURNING 1
         )
         SELECT
