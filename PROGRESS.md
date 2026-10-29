@@ -259,7 +259,8 @@ effort figure for planning.
   found three production bugs, fixed here: missing grants broke claiming,
   the retention sweep and reconciliation evidence (migration 048), and every live
   pricing refresh was recorded as failed (prune ratio typed `bigint`). A fourth,
-  sub-micro-dollar catalog prices stored as 0, is KNOWN-ISSUES K-14.
+  sub-micro-dollar catalog prices stored as 0 (KNOWN-ISSUES K-14), is fixed by
+  migration 049, which widens `unit_price_usd` to `NUMERIC(20, 10)`.
 - **Hygiene since then**: CodeQL triage, six findings fixed and the rest dismissed
   with reasons (#271); release images re-apply Alpine security fixes daily and zod
   4.6.7 (#281). Dependabot queue cleared on 2026-10-25: Actions bumps (#272, #274,
@@ -272,13 +273,13 @@ effort figure for planning.
 
 1. **Rest of Phase 2**, in roadmap order: pricing truth part 2 - calculator-captured
    golden set and nightly accuracy proof (H-12; ADR-0002 needs acceptance),
-   zod-to-OpenAPI contracts (M-08), safe VSDX parsing (M-03), and widening the
-   catalog price column (K-14).
+   zod-to-OpenAPI contracts (M-08) and safe VSDX parsing (M-03).
 2. **Phase 3**: enterprise-module scope ADR, backend modularisation, frontend
    re-architecture, one runtime target in IaC, governance.
 
 **Owner actions outstanding**: cut the first signed release (v0.2.0); run
-`npm run db:migrate` locally for migrations 043 to 048; free Colima disk space.
+`npm run db:migrate` locally for migrations 043 to 049, then a live pricing
+refresh to restore sub-micro-dollar prices (K-14); free Colima disk space.
 The legacy share-hash removal is scheduled after 2027-01-01.
 
 ## Phase 2.56 - VSDX visual evidence verification
