@@ -34,6 +34,7 @@ Useful focused commands:
 npm run api:dev
 npm run web:dev
 npm run test:unit
+npm run test:integration   # needs Docker: Postgres via Testcontainers
 npm run ci:lint
 npm run db:validate
 ```

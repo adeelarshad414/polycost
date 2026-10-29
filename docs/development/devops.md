@@ -31,7 +31,7 @@ GitHub Actions runs:
 7. `npm run devops:check`
 8. `npm run cloud:check`
 9. `npm run ci:unit`
-10. `npm run ci:integration`
+10. `npm run ci:integration` (Postgres integration specs via Testcontainers; needs Docker)
 11. `npm run ci:build`
 12. `npm run ci:e2e`
 13. `npm run security:audit`

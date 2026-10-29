@@ -509,6 +509,11 @@ npm test --workspace @polycost/api
 npm run build --workspace @polycost/api
 ```
 
+`npm run test:integration` runs the API's `*.integration.spec.ts` against a throwaway
+Postgres 16 (Testcontainers, so Docker must be running). The database is built by the
+production migrator, and the repositories connect as the real least-privilege roles, so
+a missing grant or a constraint the code breaks fails here, not in production.
+
 Database helpers:
 
 ```bash

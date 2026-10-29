@@ -82,6 +82,21 @@ once tagged releases begin.
 
 ### Added
 
+- A real integration test tier (audit H-11). `npm run test:integration` starts a
+  throwaway Postgres 16 with Testcontainers, builds it with the production
+  migrator (`docker/postgres/migrate.sh`) over every migration, and runs the
+  repositories as the least-privilege `polycost_app` and `polycost_etl` roles,
+  as the running API does. Four suites: migrations (fresh apply, idempotent
+  re-run, checksum drift refused, the roles cannot change the schema), a
+  privilege contract (every table a repository writes is granted to its role,
+  read from the SQL itself), `ApiDatabaseRepository` (comparisons and their
+  audit log, ownership, claiming, expiry, sessions, invitations, verified
+  domains, share links, billing reconciliation, the retention sweep) and the
+  pricing catalog (upserts, lineage, the H-08 prune guard). `--passWithNoTests`
+  is gone, so an empty tier fails CI. Requires Docker.
+- Per-file coverage floors for auth, sessions, SCIM, verified domains, billing,
+  money and the provider adapters (audit H-11), set at today's figures so they
+  only ratchet up.
 - Exact money arithmetic (audit M-04). One money module per app
   (`apps/api/src/money.ts`, `apps/web/src/lib/money.ts`) replaces about fifteen
   hand-rolled rounding helpers that disagreed (billing's skipped the epsilon
@@ -206,6 +221,15 @@ once tagged releases begin.
 
 ### Fixed
 
+- The API's database role was missing grants that three features depend on, each
+  a "permission denied" in production that mocked unit tests could not see
+  (found by H-11, migration 048): claiming an anonymous comparison into a team,
+  the retention sweep (stamping expiry, and deleting in `delete-expired` mode),
+  and attaching evidence to an invoice reconciliation.
+- Every live pricing refresh ended `failed` after a successful write. The H-08
+  prune guard passed its ratio next to `count(*)`, so Postgres typed it `bigint`
+  and rejected `0.9`; the prune never ran and the run was recorded as failed.
+  The ratio is now cast to `numeric` (found by H-11).
 - Money values with thousands separators (`"1,234.56"`) parsed as `1`.
 - Non-USD provider exports were summed as USD; they are now rejected.
 - Response size cap was bypassed on chunked bodies, and the request timeout

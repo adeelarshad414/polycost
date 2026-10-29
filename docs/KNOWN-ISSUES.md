@@ -10,22 +10,23 @@
 
 **Severity key:** 🔴 blocker · 🟠 high · 🟡 medium · 🔵 low / informational
 
-### At a glance — 2026-09-07
+### At a glance — 2026-10-29
 
-|     | Entry                                           | State                                            |
-| --- | ----------------------------------------------- | ------------------------------------------------ |
-| 🟢  | K-1 · `process.env` in `http-client.ts`         | fixed                                            |
-| 🟢  | K-2 · `npm audit` high-severity gate            | fixed — 0 high, 0 moderate                       |
-| 🟢  | K-3b · web container nginx runs as root         | fixed — 8080, container runs as `nginx`          |
-| 🟢  | K-3 · `pre-push` impractical locally            | fixed                                            |
-| 🟢  | K-4 · timeout when both suites run concurrently | fixed — was a product race, not CPU starvation   |
-| 🟡  | K-5 · ESLint security warnings (22)             | accepted, 0 errors                               |
-| 🟡  | K-6 · Jest worker teardown warning              | accepted, no test fails                          |
-| 🟢  | K-11 · majors blocked behind ESM                | resolved — only #168 remains, blocked by ts-jest |
-| 🟢  | K-12 · `impeccable` skips on CI's Node          | fixed — CI on Node 24, gate enforced             |
-| 🟢  | K-13 · Redis persistence disabled               | fixed                                            |
+|     | Entry                                            | State                                            |
+| --- | ------------------------------------------------ | ------------------------------------------------ |
+| 🟢  | K-1 · `process.env` in `http-client.ts`          | fixed                                            |
+| 🟢  | K-2 · `npm audit` high-severity gate             | fixed — 0 high, 0 moderate                       |
+| 🟢  | K-3b · web container nginx runs as root          | fixed — 8080, container runs as `nginx`          |
+| 🟢  | K-3 · `pre-push` impractical locally             | fixed                                            |
+| 🟢  | K-4 · timeout when both suites run concurrently  | fixed — was a product race, not CPU starvation   |
+| 🟡  | K-5 · ESLint security warnings (22)              | accepted, 0 errors                               |
+| 🟡  | K-6 · Jest worker teardown warning               | accepted, no test fails                          |
+| 🟢  | K-11 · majors blocked behind ESM                 | resolved — only #168 remains, blocked by ts-jest |
+| 🟢  | K-12 · `impeccable` skips on CI's Node           | fixed — CI on Node 24, gate enforced             |
+| 🟢  | K-13 · Redis persistence disabled                | fixed                                            |
+| 🟡  | K-14 · catalog prices below $0.0000005 read as 0 | open — needs a column-widening migration         |
 
-**Nothing is open.** Every entry is fixed or accepted. K-5 and K-6 stay accepted
+**One entry is open: K-14.** Every other entry is fixed or accepted. K-5 and K-6 stay accepted
 rather than fixed: both are warnings with zero errors and no failing test, and
 the rationale is recorded with each.
 
@@ -570,6 +571,35 @@ and job name are sent, because job data carries workload and tenant details.
 > filed as critical because the same configuration reaching a real deployment
 > would lose scheduled work with no trace, and the metric that exposed it only
 > existed for a day.
+
+## 🟡 K-14 · Catalog unit prices finer than a micro-dollar are stored as 0
+
+|            |                                                            |
+| ---------- | ---------------------------------------------------------- |
+| **Status** | 🟡 Open                                                    |
+| **Found**  | 2026-10-29, by the first Postgres integration tests (H-11) |
+
+`pricing_catalog.unit_price_usd` is `NUMERIC(14, 6)` (migration 001). Postgres
+rounds every write to six decimals, so a unit price below $0.0000005 is stored
+as `0.000000`, and anything else finer than a micro-dollar loses digits. Live
+provider feeds include such prices: per-request serverless charges are quoted per
+single request (AWS Lambda requests are $0.20 per million, $0.0000002 each).
+
+The code around it already expects more: normalized prices keep eight decimals
+(`normalized-pricing-records.ts`), and the normalized tables (`storage_pricing`,
+`egress_tier_rates`, `pricing_snapshots`) are `NUMERIC(14, 8)`. Only the raw
+catalog truncates.
+
+**Reproduced by** `pricing-catalog.repository.integration.spec.ts`: the test
+"keeps unit prices finer than a micro-dollar (K-14)" is marked `it.failing`, so CI
+stays green while it fails and goes red the day the column is fixed, so the
+marker gets removed.
+
+**Fix:** widen the column (for example to `NUMERIC(20, 10)`). Changing the scale
+rewrites `pricing_catalog` under an exclusive lock, so under the migration lock
+rules (audit H-09) this needs either the add-column-and-backfill pattern or a
+reviewed `migrate:allow-lock` opt-out with the table size at the time. Then
+re-run a live refresh so the affected SKUs get their real prices.
 
 ## 🔵 Incomplete by design
 
